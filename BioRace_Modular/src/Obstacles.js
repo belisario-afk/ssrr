@@ -241,8 +241,9 @@ export class ObstacleManager {
                 group.add(new THREE.Mesh(geo, mat));
             }
             // Use sphere collision for better GLB model detection
+            // Kinematic body for predictable straight movement
             const shape = new CANNON.Sphere(collisionRadius);
-            body = new CANNON.Body({ mass: 2, shape: shape });
+            body = new CANNON.Body({ mass: 0, shape: shape, type: CANNON.Body.KINEMATIC });
             
             // Collision effect: STUN
             body.addEventListener("collide", (e) => {
@@ -279,8 +280,9 @@ export class ObstacleManager {
                 }
             }
             // Use sphere collision for better GLB model detection
+            // Kinematic body for predictable straight movement
             const shape = new CANNON.Sphere(collisionRadius);
-            body = new CANNON.Body({ mass: 5, shape: shape });
+            body = new CANNON.Body({ mass: 0, shape: shape, type: CANNON.Body.KINEMATIC });
             
             // Collision effect: DAMAGE (setback)
             body.addEventListener("collide", (e) => {
@@ -309,9 +311,9 @@ export class ObstacleManager {
                 group.add(new THREE.Mesh(geo, mat));
             }
             // Use sphere collision for better GLB model detection
-            // Higher mass (like other straight obstacles) prevents physics from throwing it around
+            // Use kinematic body for predictable straight movement (no physics forces affect it)
             const shape = new CANNON.Sphere(collisionRadius);
-            body = new CANNON.Body({ mass: 5, shape: shape, fixedRotation: false });
+            body = new CANNON.Body({ mass: 0, shape: shape, type: CANNON.Body.KINEMATIC });
             
             // Collision effect: MINOR DAMAGE
             body.addEventListener("collide", (e) => {
@@ -457,14 +459,14 @@ export class ObstacleManager {
 
         body.position.set(randX, randY, spawnZ);
         
+        // Store spin rate for rotation animation
+        let spinRate = spin;
+        
         // Set up movement based on type
         if (movementType === 'straight') {
-            // Straight obstacles move toward player along Z axis with controlled spin
-            body.velocity.set(0, 0, speed); // Move toward player (positive Z)
-            body.angularVelocity.set(spin, spin * 0.5, 0); // Controlled spin around X/Y
-            body.linearDamping = 0; // No slowdown
-            body.angularDamping = 0.1;
-        } else if (type !== 'CONDOM' && type !== 'FALLEN' && type !== 'PILL') {
+            // Kinematic bodies - we'll move them manually in update()
+            // No velocity needed - we update position directly
+        } else if (type !== 'FALLEN' && type !== 'PILL') {
             // Floating obstacles have gentle random movement and spin
             body.angularVelocity.set(
                 (Math.random() - 0.5) * spin,
@@ -476,10 +478,10 @@ export class ObstacleManager {
 
         this.world.physicsWorld.addBody(body);
         this.world.scene.add(group);
-        this.obstacles.push({ mesh: group, body: body, type: type, movementType: movementType, speed: speed });
+        this.obstacles.push({ mesh: group, body: body, type: type, movementType: movementType, speed: speed, spinRate: spinRate, spawnX: randX, spawnY: randY });
     }
 
-    update() {
+    update(deltaTime = 1/60) {
         const tunnelRadius = CONFIG.TUNNEL_RADIUS * 0.95; // Keep obstacles inside tube
         
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
@@ -493,36 +495,34 @@ export class ObstacleManager {
                 continue;
             }
             
-            // Keep obstacles inside the tube (constrain X/Y position)
-            const pos = o.body.position;
-            const distFromCenter = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
-            if (distFromCenter > tunnelRadius) {
-                // Push back toward center
-                const angle = Math.atan2(pos.y, pos.x);
-                pos.x = Math.cos(angle) * tunnelRadius;
-                pos.y = Math.sin(angle) * tunnelRadius;
-                // Kill X/Y velocity completely for straight obstacles
-                if (o.movementType === 'straight') {
-                    o.body.velocity.x = 0;
-                    o.body.velocity.y = 0;
-                } else {
-                    // Bounce velocity inward for floating
+            // Handle straight-moving obstacles (kinematic - direct position control)
+            if (o.movementType === 'straight') {
+                // Move straight along Z axis toward player (constant speed, no physics drift)
+                o.body.position.z += o.speed * deltaTime;
+                
+                // Keep X/Y position FIXED at spawn position (no drifting!)
+                o.body.position.x = o.spawnX;
+                o.body.position.y = o.spawnY;
+                
+                // Rotate for visual effect (spin around Z axis so it looks like rolling toward player)
+                const spinAxis = new CANNON.Vec3(0, 0, 1); // Roll along tube axis
+                const spinAngle = o.spinRate * deltaTime;
+                const spinQuat = new CANNON.Quaternion();
+                spinQuat.setFromAxisAngle(spinAxis, spinAngle);
+                o.body.quaternion = o.body.quaternion.mult(spinQuat);
+            } else {
+                // Floating obstacles - let physics handle movement but constrain to tube
+                const pos = o.body.position;
+                const distFromCenter = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
+                if (distFromCenter > tunnelRadius) {
+                    // Push back toward center
+                    const angle = Math.atan2(pos.y, pos.x);
+                    pos.x = Math.cos(angle) * tunnelRadius;
+                    pos.y = Math.sin(angle) * tunnelRadius;
+                    // Bounce velocity inward
                     o.body.velocity.x *= -0.5;
                     o.body.velocity.y *= -0.5;
                 }
-            }
-            
-            // For straight-moving obstacles, maintain constant forward velocity and stable position
-            if (o.movementType === 'straight') {
-                // Keep moving toward player at constant speed
-                o.body.velocity.z = o.speed;
-                // Strongly constrain X/Y velocity to prevent drifting/curving
-                o.body.velocity.x *= 0.5;
-                o.body.velocity.y *= 0.5;
-                // Keep angular velocity controlled (no wild spinning)
-                o.body.angularVelocity.x = Math.max(-2, Math.min(2, o.body.angularVelocity.x));
-                o.body.angularVelocity.y = Math.max(-2, Math.min(2, o.body.angularVelocity.y));
-                o.body.angularVelocity.z = Math.max(-1, Math.min(1, o.body.angularVelocity.z));
             }
 
             o.mesh.position.copy(o.body.position);
