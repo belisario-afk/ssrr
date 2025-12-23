@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { CONFIG } from './Config.js';
 import { logEvent } from './Utils.js';
 import { getAudioSystem } from './AudioSystem.js';
@@ -12,6 +13,10 @@ export class Player {
         this.isRemote = options.isRemote || false;
         this.color = options.color || CONFIG.PLAYER_COLOR;
         this.name = options.name || "Player";
+        
+        // Animation mixer for GLB models
+        this.mixer = null;
+        this.animationActions = [];
 
         // Boost System
         this.boostCharges = 0; // Starts empty!
@@ -40,7 +45,9 @@ export class Player {
 
         // Visual Group
         this.mesh = new THREE.Group();
-        this.createMesh();
+        
+        // Try to load custom swimmer model, fallback to procedural
+        this.loadCustomModel();
         
         // Light attachment (Only for local player to save performance)
         if (!this.isRemote) {
@@ -62,6 +69,58 @@ export class Player {
         if (!this.isRemote) {
             this.initInput();
         }
+    }
+    
+    /**
+     * Try to load custom animated swimmer GLB model
+     * Falls back to procedural mesh if not found
+     */
+    loadCustomModel() {
+        const loader = new GLTFLoader();
+        loader.load(
+            './models/swimmer.glb',
+            (gltf) => {
+                console.log('✓ Loaded custom swimmer model');
+                const model = gltf.scene;
+                
+                // Scale the model appropriately
+                model.scale.set(0.5, 0.5, 0.5);
+                
+                // Apply color tint to model materials
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        // Clone material to allow individual coloring
+                        child.material = child.material.clone();
+                        // Optionally tint with player color
+                        if (child.material.color) {
+                            child.material.color.lerp(new THREE.Color(this.color), 0.3);
+                        }
+                    }
+                });
+                
+                this.mesh.add(model);
+                this.customModel = model;
+                
+                // Set up animations if present
+                if (gltf.animations && gltf.animations.length > 0) {
+                    this.mixer = new THREE.AnimationMixer(model);
+                    gltf.animations.forEach((clip) => {
+                        const action = this.mixer.clipAction(clip);
+                        action.play();
+                        this.animationActions.push(action);
+                    });
+                    console.log(`✓ Loaded ${gltf.animations.length} animation(s)`);
+                }
+            },
+            undefined,
+            (error) => {
+                console.log('Swimmer model not found, using procedural mesh');
+                this.createMesh();
+            }
+        );
+        
+        // Create procedural mesh as immediate fallback (will be hidden if GLB loads)
+        this.createMesh();
     }
 
     createMesh() {
@@ -319,8 +378,15 @@ export class Player {
         }
 
         // 6. Tail Uniforms
-        this.tailMat.uniforms.uTime.value = time;
-        this.tailMat.uniforms.uSpeed.value = this.body.velocity.length() * 0.05;
+        if (this.tailMat) {
+            this.tailMat.uniforms.uTime.value = time;
+            this.tailMat.uniforms.uSpeed.value = this.body.velocity.length() * 0.05;
+        }
+        
+        // 7. Update animation mixer for custom GLB models
+        if (this.mixer) {
+            this.mixer.update(dt);
+        }
     }
 
     applyConstraints() {

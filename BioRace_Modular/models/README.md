@@ -2,47 +2,61 @@
 
 Place your `.glb` model files in this folder.
 
-## Required File Names
+## Obstacle Models
 
 | Model File | Effect | Spawn Key | Damage |
 |------------|--------|-----------|--------|
 | `condom.glb` | **STUN** | `1` | Freezes 2 seconds |
 | `cucumber.glb` | **DAMAGE** | `2` | Setback 50m |
-| `vibrator.glb` | **WIPEOUT** | `3` | Reset to start |
-| `banana.glb` | **SLIP** | `4` | Setback 25m |
-| `iud.glb` | **HEAVY DAMAGE** | `5` | Setback 75m |
-| `hairbrush.glb` | **STUN** | `6` | Freezes 1.5 seconds |
+| `banana.glb` | **SLIP** | `3` | Setback 25m |
+| `iud.glb` | **HEAVY DAMAGE** | `4` | Setback 75m |
+| `hairbrush.glb` | **STUN** | `5` | Freezes 1.5 seconds |
+
+## Player Model (Optional)
+
+| Model File | Description |
+|------------|-------------|
+| `swimmer.glb` | Custom animated swimmer model |
+
+If `swimmer.glb` is present with animations, they will play automatically!
 
 ## Other Spawn Keys
 
-- **Key 7**: Fallen swimmer (no damage, visual obstacle)
-- **Key 8**: Power-up Pill (+3 boost charges)
+- **Key 6**: Fallen swimmer (no damage, visual obstacle)
+- **Key 7**: Power-up Pill (+3 boost charges)
 
 ## Model Scales (configured in code)
 
-All models are set to the same uniform scale (3x) for consistent sizing:
-
 | Model | Scale (x, y, z) |
 |-------|-----------------|
-| Condom | 3, 3, 3 |
-| Cucumber | 3, 3, 3 |
-| Vibrator | 3, 3, 3 |
+| Condom | 150, 150, 150 |
+| Cucumber | 143, 143, 143 |
 | Banana | 3, 3, 3 |
 | IUD | 3, 3, 3 |
 | Hairbrush | 3, 3, 3 |
+| Swimmer | 0.5, 0.5, 0.5 |
 
-To adjust scales, edit `modelScales` in `src/Obstacles.js`.
+To adjust scales, edit `modelScales` in `src/Obstacles.js` or swimmer scale in `src/Player.js`.
+
+## Collision Radii (for better hit detection)
+
+| Model | Collision Radius |
+|-------|-----------------|
+| Condom | 4 |
+| Cucumber | 3.5 |
+| Banana | 2 |
+| IUD | 2.5 |
+| Hairbrush | 2 |
 
 ## Collision Effects Summary
 
 - **CONDOM** (Key 1): Stuns the player for 2 seconds
 - **CUCUMBER** (Key 2): Deals damage, pushing back 50 meters
-- **VIBRATOR** (Key 3): Instant wipeout, resets to start
-- **BANANA** (Key 4): Slip damage, pushes back 25 meters
-- **IUD** (Key 5): Heavy damage, pushes back 75 meters
-- **HAIRBRUSH** (Key 6): Stuns the player for 1.5 seconds
-- **FALLEN** (Key 7): No damage, visual obstacle
-- **PILL** (Key 8): Power-up, gives +3 boost charges
+- **BANANA** (Key 3): Slip damage, pushes back 25 meters
+- **IUD** (Key 4): Heavy damage, pushes back 75 meters
+- **HAIRBRUSH** (Key 5): Stuns the player for 1.5 seconds
+- **FALLEN** (Key 6): No damage, visual obstacle
+- **PILL** (Key 7): Power-up, gives +3 boost charges
 
 ## How to Export GLB from Blender
 
@@ -50,7 +64,7 @@ To adjust scales, edit `modelScales` in `src/Obstacles.js`.
 2. Select all objects you want to export
 3. Go to **File → Export → glTF 2.0 (.glb/.gltf)**
 4. Choose **GLB** format (binary, single file)
-5. Enable **Selected Objects** if you only want certain objects
+5. For animated models, enable **Animations** in export settings
 6. Click **Export**
 
 ## Model Guidelines
@@ -59,6 +73,7 @@ To adjust scales, edit `modelScales` in `src/Obstacles.js`.
 - **Origin**: Center your model's origin point for proper rotation
 - **Materials**: Use PBR materials (they translate best to Three.js)
 - **File Size**: Keep models under 5MB for best web performance
+- **Animations**: For swimmer model, include swimming animation in the GLB file
 
 ## Spawn Behavior
 
@@ -67,6 +82,6 @@ All obstacles spawn **inside the tube** (within 70% of tunnel radius) to ensure 
 ## Troubleshooting
 
 - **Model not showing**: Check browser console for loading errors
-- **Wrong size**: Adjust scale values in `modelScales` object in Obstacles.js
+- **Wrong size**: Adjust scale values in Obstacles.js or Player.js
 - **Wrong orientation**: Rotate model in Blender before export
-- **Collision not working**: Physics shapes are approximate; adjust in spawn function if needed
+- **Animation not playing**: Ensure animations are included in GLB export

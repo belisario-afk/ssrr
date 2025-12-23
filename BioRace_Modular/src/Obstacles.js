@@ -18,29 +18,36 @@ export class ObstacleManager {
         // Cache for loaded models (clone from these)
         this.modelCache = {};
         
-        // Model scale configurations for each type (all same size as IUD)
+        // Model scale configurations for each type
         this.modelScales = {
-            'CONDOM': { x: 3, y: 3, z: 3 },
-            'CUCUMBER': { x: 3, y: 3, z: 3 },
-            'VIBRATOR': { x: 3, y: 3, z: 3 },
+            'CONDOM': { x: 150, y: 150, z: 150 },
+            'CUCUMBER': { x: 143, y: 143, z: 143 },
             'BANANA': { x: 3, y: 3, z: 3 },
             'IUD': { x: 3, y: 3, z: 3 },
             'HAIRBRUSH': { x: 3, y: 3, z: 3 }
         };
         
+        // Collision radius for each model type (for better hit detection)
+        this.collisionRadii = {
+            'CONDOM': 4,
+            'CUCUMBER': 3.5,
+            'BANANA': 2,
+            'IUD': 2.5,
+            'HAIRBRUSH': 2
+        };
+        
         // Preload custom models
         this.preloadModels();
 
-        // Listen for Spawn Keys - 6 obstacle types + power-up
+        // Listen for Spawn Keys - 5 obstacle types + power-up
         window.addEventListener('keydown', (e) => {
             if(e.key === '1') this.spawn('CONDOM');      // Condom - stuns player
             if(e.key === '2') this.spawn('CUCUMBER');    // Cucumber - damage/setback
-            if(e.key === '3') this.spawn('VIBRATOR');    // Vibrator - wipes out (reset)
-            if(e.key === '4') this.spawn('BANANA');      // Banana - minor damage
-            if(e.key === '5') this.spawn('IUD');         // IUD - heavy damage
-            if(e.key === '6') this.spawn('HAIRBRUSH');   // Hairbrush - stun
-            if(e.key === '7') this.spawn('FALLEN');      // Fallen swimmer (no damage)
-            if(e.key === '8') this.spawn('PILL');        // Power-up
+            if(e.key === '3') this.spawn('BANANA');      // Banana - minor damage
+            if(e.key === '4') this.spawn('IUD');         // IUD - heavy damage
+            if(e.key === '5') this.spawn('HAIRBRUSH');   // Hairbrush - stun
+            if(e.key === '6') this.spawn('FALLEN');      // Fallen swimmer (no damage)
+            if(e.key === '7') this.spawn('PILL');        // Power-up
         });
     }
     
@@ -52,7 +59,6 @@ export class ObstacleManager {
         const modelFiles = {
             'CONDOM': './models/condom.glb',
             'CUCUMBER': './models/cucumber.glb',
-            'VIBRATOR': './models/vibrator.glb',
             'BANANA': './models/banana.glb',
             'IUD': './models/iud.glb',
             'HAIRBRUSH': './models/hairbrush.glb'
@@ -164,6 +170,9 @@ export class ObstacleManager {
         
         // Get scale for this model type
         const scale = this.modelScales[type] || { x: 2, y: 2, z: 2 };
+        
+        // Get collision radius for this model type (for better GLB collision)
+        const collisionRadius = this.collisionRadii[type] || 2;
 
         if (type === 'CONDOM') {
             // CONDOM - Stuns player for 2 seconds
@@ -182,11 +191,9 @@ export class ObstacleManager {
                 });
                 group.add(new THREE.Mesh(geo, mat));
             }
-            const shape = new CANNON.Cylinder(2, 2, 6, 16);
-            const q = new CANNON.Quaternion();
-            q.setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2);
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
             body = new CANNON.Body({ mass: 2, shape: shape });
-            body.quaternion.copy(q);
             
             // Collision effect: STUN
             body.addEventListener("collide", (e) => {
@@ -222,7 +229,8 @@ export class ObstacleManager {
                     group.add(bump);
                 }
             }
-            const shape = new CANNON.Cylinder(1, 1, 5, 8);
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
             body = new CANNON.Body({ mass: 5, shape: shape });
             
             // Collision effect: DAMAGE (setback)
@@ -234,44 +242,6 @@ export class ObstacleManager {
             });
             
             logEvent("🥒 CUCUMBER!\nDAMAGE ON HIT");
-
-        } else if (type === 'VIBRATOR') {
-            // VIBRATOR - Wipes out player (reset to start area)
-            if (customModel) {
-                customModel.scale.set(scale.x, scale.y, scale.z);
-                group.add(customModel);
-            } else {
-                // Fallback - pink/purple capsule with motor
-                const bodyGeo = new THREE.CapsuleGeometry(0.8, 3, 8, 16);
-                const bodyMat = new THREE.MeshStandardMaterial({ 
-                    color: 0xff69b4, 
-                    roughness: 0.3,
-                    metalness: 0.5
-                });
-                const vibratorMesh = new THREE.Mesh(bodyGeo, bodyMat);
-                group.add(vibratorMesh);
-                // Add base
-                const base = new THREE.Mesh(
-                    new THREE.CylinderGeometry(1.2, 1.2, 1, 16),
-                    new THREE.MeshStandardMaterial({ color: 0x8b008b, metalness: 0.8 })
-                );
-                base.position.y = -2.5;
-                group.add(base);
-            }
-            const shape = new CANNON.Cylinder(1, 1, 5, 8);
-            body = new CANNON.Body({ mass: 8, shape: shape });
-            // Make it vibrate/shake
-            body.angularVelocity.set(0, 10, 0);
-            
-            // Collision effect: WIPEOUT (reset)
-            body.addEventListener("collide", (e) => {
-                if(e.body === this.player.body && !body.hasHit) {
-                    body.hasHit = true;
-                    this.player.resetToCheckpoint(0); // Reset to start
-                }
-            });
-            
-            logEvent("💀 VIBRATOR!\nWIPEOUT ON HIT");
 
         } else if (type === 'BANANA') {
             // BANANA - Minor damage (setback 25m)
@@ -289,7 +259,8 @@ export class ObstacleManager {
                 const mat = new THREE.MeshStandardMaterial({ color: 0xffe135, roughness: 0.4 });
                 group.add(new THREE.Mesh(geo, mat));
             }
-            const shape = new CANNON.Cylinder(0.6, 0.6, 4, 8);
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
             body = new CANNON.Body({ mass: 3, shape: shape });
             
             // Collision effect: MINOR DAMAGE
@@ -317,7 +288,8 @@ export class ObstacleManager {
                 group.add(vertical);
                 group.add(horizontal);
             }
-            const shape = new CANNON.Sphere(2);
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
             body = new CANNON.Body({ mass: 6, shape: shape });
             
             // Collision effect: HEAVY DAMAGE
@@ -362,7 +334,8 @@ export class ObstacleManager {
                     group.add(bristle);
                 }
             }
-            const shape = new CANNON.Box(new CANNON.Vec3(0.8, 0.4, 3));
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
             body = new CANNON.Body({ mass: 4, shape: shape });
             
             // Collision effect: STUN
