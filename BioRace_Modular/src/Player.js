@@ -180,8 +180,75 @@ export class Player {
             getAudioSystem().playSFX('pickup');
         }
     }
+    
+    /**
+     * Take damage - pushes player backward
+     * @param {number} amount - Amount of setback in units
+     */
+    takeDamage(amount) {
+        // Push player backwards
+        this.body.position.z += amount;
+        // Add knockback impulse
+        this.body.velocity.z = amount * 2;
+        // Visual feedback - flash red
+        if (this.headMaterial) {
+            const originalColor = this.headMaterial.color.clone();
+            this.headMaterial.color.setHex(0xff0000);
+            this.headMaterial.emissive.setHex(0xff0000);
+            setTimeout(() => {
+                this.headMaterial.color.copy(originalColor);
+                this.headMaterial.emissive.copy(originalColor);
+            }, 200);
+        }
+        if(!this.isRemote) {
+            logEvent(`💥 DAMAGE!\nSET BACK ${amount}m`);
+            getAudioSystem().playSFX('hit');
+        }
+    }
+    
+    /**
+     * Reset player position to a checkpoint
+     * @param {number} zPosition - Z position to reset to (positive = back toward start)
+     */
+    resetToCheckpoint(zPosition) {
+        this.body.position.z = zPosition;
+        this.body.position.x = 0;
+        this.body.position.y = 0;
+        this.body.velocity.set(0, 0, 0);
+        this.boostCharges = 0; // Lose boost charges
+        if(!this.isRemote) {
+            logEvent(`☠️ WIPED OUT!\nRESET TO START`);
+            getAudioSystem().playSFX('hit');
+        }
+    }
+    
+    /**
+     * Stun player - stops movement temporarily
+     * @param {number} duration - Duration in seconds
+     */
+    stun(duration) {
+        this.isStunned = true;
+        this.body.velocity.set(0, 0, 0);
+        // Visual effect - spin
+        this.body.angularVelocity.set(5, 5, 5);
+        if(!this.isRemote) {
+            logEvent(`😵 STUNNED!\n${duration}s`);
+            getAudioSystem().playSFX('hit');
+        }
+        setTimeout(() => {
+            this.isStunned = false;
+            this.body.angularVelocity.set(0, 0, 0);
+        }, duration * 1000);
+    }
 
     update(dt, time) {
+        // Skip update if stunned
+        if (this.isStunned) {
+            this.mesh.position.copy(this.body.position);
+            this.mesh.quaternion.copy(this.body.quaternion);
+            return;
+        }
+        
         // 1. Propulsion (Base Speed)
         this.body.applyForce(new CANNON.Vec3(0, 0, -CONFIG.SPEED), this.body.position);
 

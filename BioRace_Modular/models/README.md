@@ -4,11 +4,19 @@ Place your `.glb` model files in this folder.
 
 ## Required File Names
 
-| Model File | Replaces | Spawn Key |
-|------------|----------|-----------|
-| `banana.glb` | Condom obstacle | `1` |
-| `hairbrush.glb` | Toothbrush obstacle | `2` |
-| `iud.glb` | IUD obstacle | `3` |
+| Model File | Effect | Spawn Key |
+|------------|--------|-----------|
+| `condom.glb` | **STUN** - Freezes player for 2 seconds | `1` |
+| `cucumber.glb` | **DAMAGE** - Sets player back 50 meters | `2` |
+| `vibrator.glb` | **WIPEOUT** - Resets player to start | `3` |
+
+## Collision Effects
+
+- **CONDOM** (Key 1): Stuns the player for 2 seconds, stopping all movement
+- **CUCUMBER** (Key 2): Deals damage, pushing the player back 50 meters  
+- **VIBRATOR** (Key 3): Instant wipeout, resets player to start position and removes boost charges
+- **FALLEN** (Key 4): No damage, just a visual obstacle (fallen swimmers)
+- **PILL** (Key 5): Power-up, gives +3 boost charges
 
 ## How to Export GLB from Blender
 
@@ -33,9 +41,9 @@ To add more custom models, edit `src/Obstacles.js`:
 ```javascript
 // In preloadModels(), add your mapping:
 const modelFiles = {
-    'CONDOM': './models/banana.glb',
-    'IUD': './models/iud.glb',
-    'TOOTHBRUSH': './models/hairbrush.glb',
+    'CONDOM': './models/condom.glb',
+    'CUCUMBER': './models/cucumber.glb',
+    'VIBRATOR': './models/vibrator.glb',
     'YOUR_NEW_TYPE': './models/your_model.glb'  // Add this
 };
 ```
@@ -45,3 +53,4 @@ const modelFiles = {
 - **Model not showing**: Check browser console for loading errors
 - **Wrong size**: Adjust `customModel.scale.set(x, y, z)` in spawn function
 - **Wrong orientation**: Rotate model in Blender before export, or add rotation in code
+- **Collision not working**: Make sure physics shape matches model size approximately

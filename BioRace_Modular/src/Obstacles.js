@@ -23,11 +23,11 @@ export class ObstacleManager {
 
         // Listen for Spawn Keys
         window.addEventListener('keydown', (e) => {
-            if(e.key === '1') this.spawn('CONDOM');
-            if(e.key === '2') this.spawn('TOOTHBRUSH');
-            if(e.key === '3') this.spawn('IUD');
-            if(e.key === '4') this.spawn('FALLEN');
-            if(e.key === '5') this.spawn('PILL');
+            if(e.key === '1') this.spawn('CONDOM');      // Condom - stuns player
+            if(e.key === '2') this.spawn('CUCUMBER');    // Cucumber - damage/setback
+            if(e.key === '3') this.spawn('VIBRATOR');    // Vibrator - wipes out (reset)
+            if(e.key === '4') this.spawn('FALLEN');      // Fallen swimmer (no damage)
+            if(e.key === '5') this.spawn('PILL');        // Power-up
         });
     }
     
@@ -37,9 +37,9 @@ export class ObstacleManager {
      */
     preloadModels() {
         const modelFiles = {
-            'CONDOM': './models/banana.glb',      // Banana replaces condom
-            'IUD': './models/iud.glb',            // IUD model  
-            'TOOTHBRUSH': './models/hairbrush.glb' // Hairbrush replaces toothbrush
+            'CONDOM': './models/condom.glb',       // Condom model - stuns
+            'CUCUMBER': './models/cucumber.glb',   // Cucumber model - damage
+            'VIBRATOR': './models/vibrator.glb'    // Vibrator model - wipeout
             // Add more mappings as needed
         };
         
@@ -128,35 +128,21 @@ export class ObstacleManager {
         // Try to use custom model if available
         const customModel = this.getModel(type);
 
-        if (type === 'TOOTHBRUSH') {
+        if (type === 'CONDOM') {
+            // CONDOM - Stuns player for 2 seconds
             if (customModel) {
-                // Use custom hairbrush model
-                customModel.scale.set(2, 2, 2); // Adjust scale as needed
+                customModel.scale.set(3, 3, 3);
                 group.add(customModel);
             } else {
-                // Fallback to procedural geometry
-                const hGeo = new THREE.BoxGeometry(0.5, 0.5, 12);
-                const hMat = new THREE.MeshStandardMaterial({ color: 0x0088ff });
-                group.add(new THREE.Mesh(hGeo, hMat));
-                const bGeo = new THREE.BoxGeometry(0.8, 1.5, 2.5);
-                const bMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                const bristles = new THREE.Mesh(bGeo, bMat);
-                bristles.position.set(0, 0.8, -4);
-                group.add(bristles);
-            }
-            const shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 6));
-            body = new CANNON.Body({ mass: 10, shape: shape });
-            logEvent("⚠️ OBSTACLE:\nHAIRBRUSH");
-
-        } else if (type === 'CONDOM') {
-            if (customModel) {
-                // Use custom banana model
-                customModel.scale.set(3, 3, 3); // Adjust scale as needed
-                group.add(customModel);
-            } else {
-                // Fallback to procedural geometry
+                // Fallback - translucent cylinder
                 const geo = new THREE.CylinderGeometry(2.5, 2.5, 8, 32, 1, true);
-                const mat = new THREE.MeshPhysicalMaterial({ color: 0xffffdd, transmission: 0.9, opacity: 1, side: THREE.DoubleSide });
+                const mat = new THREE.MeshPhysicalMaterial({ 
+                    color: 0xffffdd, 
+                    transmission: 0.9, 
+                    opacity: 0.7, 
+                    transparent: true,
+                    side: THREE.DoubleSide 
+                });
                 group.add(new THREE.Mesh(geo, mat));
             }
             const shape = new CANNON.Cylinder(2.5, 2.5, 8, 16);
@@ -164,26 +150,91 @@ export class ObstacleManager {
             q.setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2);
             body = new CANNON.Body({ mass: 2, shape: shape });
             body.quaternion.copy(q);
-            logEvent("⚠️ OBSTACLE:\nBANANA");
+            
+            // Collision effect: STUN
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.stun(2); // Stun for 2 seconds
+                }
+            });
+            
+            logEvent("⚠️ CONDOM!\nSTUNS ON HIT");
 
-        } else if (type === 'IUD') {
+        } else if (type === 'CUCUMBER') {
+            // CUCUMBER - Deals damage (setback 50m)
             if (customModel) {
-                // Use custom IUD model
-                customModel.scale.set(2, 2, 2); // Adjust scale as needed
+                customModel.scale.set(2, 2, 2);
                 group.add(customModel);
             } else {
-                // Fallback to procedural geometry
-                const cMat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 1 });
-                const v = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4), cMat);
-                const h = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 3), cMat);
-                h.rotation.z = Math.PI/2;
-                h.position.y = 1.5;
-                group.add(v);
-                group.add(h);
+                // Fallback - green cylinder
+                const geo = new THREE.CylinderGeometry(0.8, 0.8, 6, 16);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x228b22, roughness: 0.6 });
+                group.add(new THREE.Mesh(geo, mat));
+                // Add bumps
+                for(let i = 0; i < 8; i++) {
+                    const bump = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.15, 8, 8),
+                        mat
+                    );
+                    bump.position.set(
+                        Math.cos(i * Math.PI/4) * 0.7,
+                        (Math.random() - 0.5) * 5,
+                        Math.sin(i * Math.PI/4) * 0.7
+                    );
+                    group.add(bump);
+                }
             }
-            const shape = new CANNON.Sphere(2.5); 
+            const shape = new CANNON.Cylinder(0.8, 0.8, 6, 8);
             body = new CANNON.Body({ mass: 5, shape: shape });
-            logEvent("⚠️ OBSTACLE:\nIUD");
+            
+            // Collision effect: DAMAGE (setback)
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.takeDamage(50); // Push back 50 meters
+                }
+            });
+            
+            logEvent("🥒 CUCUMBER!\nDAMAGE ON HIT");
+
+        } else if (type === 'VIBRATOR') {
+            // VIBRATOR - Wipes out player (reset to start area)
+            if (customModel) {
+                customModel.scale.set(2, 2, 2);
+                group.add(customModel);
+            } else {
+                // Fallback - pink/purple capsule with motor
+                const bodyGeo = new THREE.CapsuleGeometry(1, 4, 8, 16);
+                const bodyMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xff69b4, 
+                    roughness: 0.3,
+                    metalness: 0.5
+                });
+                const vibratorMesh = new THREE.Mesh(bodyGeo, bodyMat);
+                group.add(vibratorMesh);
+                // Add base
+                const base = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.2, 1.2, 1, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x8b008b, metalness: 0.8 })
+                );
+                base.position.y = -2.5;
+                group.add(base);
+            }
+            const shape = new CANNON.Cylinder(1, 1, 5, 8);
+            body = new CANNON.Body({ mass: 8, shape: shape });
+            // Make it vibrate/shake
+            body.angularVelocity.set(0, 10, 0);
+            
+            // Collision effect: WIPEOUT (reset)
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.resetToCheckpoint(0); // Reset to start
+                }
+            });
+            
+            logEvent("💀 VIBRATOR!\nWIPEOUT ON HIT");
 
         } else if (type === 'FALLEN') {
             const skinTones = [0xffdbac, 0xf1c27d, 0xe0ac69, 0x8d5524, 0xffe0bd, 0xfffff0];
