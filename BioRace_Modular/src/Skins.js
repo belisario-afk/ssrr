@@ -247,7 +247,7 @@ export class SkinManager {
             base: 'default',
             hat: 'none',
             trail: 'none',
-            aura: 'soft_glow'
+            aura: 'none'
         };
         
         this.unlockedItems = this.loadUnlocked();

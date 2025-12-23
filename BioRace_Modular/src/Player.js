@@ -17,6 +17,10 @@ export class Player {
         this.boostCharges = 0; // Starts empty!
         this.canBoost = true;
         this.boostTimer = 0;
+        
+        // AI movement timer for smoother remote player movement
+        this.aiMoveTimer = 0;
+        this.aiTargetOffset = { x: 0, y: 0 };
 
         // Physics Body
         const shape = new CANNON.Sphere(0.5);
@@ -203,10 +207,24 @@ export class Player {
             }
         } else {
             // REMOTE / AI BEHAVIOR
-            // Add slight randomness so they don't look like robots
+            // Smoother AI movement - change direction periodically instead of every frame
+            this.aiMoveTimer -= dt;
+            if (this.aiMoveTimer <= 0) {
+                // Pick a new target offset every 0.5-1.5 seconds
+                this.aiMoveTimer = 0.5 + Math.random() * 1.0;
+                this.aiTargetOffset = {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                };
+            }
+            
+            // Apply smooth steering towards target offset
+            const steerX = this.aiTargetOffset.x - this.body.position.x;
+            const steerY = this.aiTargetOffset.y - this.body.position.y;
+            
             this.body.applyForce(new CANNON.Vec3(
-                (Math.random() - 0.5) * 5, 
-                (Math.random() - 0.5) * 5, 
+                steerX * 0.5, 
+                steerY * 0.5, 
                 0
             ), this.body.position);
         }
@@ -220,8 +238,13 @@ export class Player {
         // 4. Wall Constraint
         this.applyConstraints();
 
-        // 5. Sync Visuals
-        this.mesh.position.copy(this.body.position);
+        // 5. Sync Visuals - use lerp for smoother movement on remote players
+        if (this.isRemote) {
+            // Smooth interpolation for remote players
+            this.mesh.position.lerp(this.body.position, 0.15);
+        } else {
+            this.mesh.position.copy(this.body.position);
+        }
         
         if (this.body.velocity.lengthSquared() > 0.1) {
             const lookTarget = this.mesh.position.clone().add(this.body.velocity);

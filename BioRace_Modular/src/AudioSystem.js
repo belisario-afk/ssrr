@@ -241,6 +241,12 @@ export class AudioSystem {
     }
     
     createAmbientMusic() {
+        // Disabled background music to avoid audio buzz issues
+        // Music can be enabled later with proper audio files
+        // For now, we keep only sound effects active
+        return;
+        
+        /* Original procedural music - commented out due to potential buzz
         // Bass drone
         this.bassDrone = this.audioContext.createOscillator();
         this.bassDrone.type = 'sine';
@@ -297,6 +303,7 @@ export class AudioSystem {
         this.padOsc1.start();
         this.padOsc2.start();
         this.filterLFO.start();
+        */
     }
     
     stopMusic() {
