@@ -179,14 +179,18 @@ export class TikTokConnector {
     handleGift(data) {
         const { giftName, giftId, senderName, senderId, repeatCount, diamondCount } = data;
         
-        console.log(`[TikTok] Gift received: ${giftName} x${repeatCount} from ${senderName} (${diamondCount} diamonds)`);
+        // TikTok sends diamondCount which represents coin value
+        const coinValue = diamondCount || 1;
+        const totalCoins = coinValue * (repeatCount || 1);
         
-        // Map TikTok gift to game gift
-        const gameGiftName = this.mapTikTokGift(giftName, giftId, diamondCount);
+        console.log(`[TikTok] Gift received: ${giftName} x${repeatCount} from ${senderName} (${totalCoins} coins total)`);
         
-        // Trigger the gift in the game
+        // Map TikTok gift to game gift tier based on total coin value
+        const gameGiftName = this.mapTikTokGift(giftName, giftId, coinValue);
+        
+        // Trigger the gift in the game with total coin value for proper scaling
         if (this.giftSystem) {
-            this.giftSystem.triggerGift(gameGiftName, senderName, repeatCount);
+            this.giftSystem.triggerGiftByCoins(senderName, totalCoins, repeatCount, giftName);
         }
         
         // Track viewer
@@ -198,17 +202,19 @@ export class TikTokConnector {
     
     /**
      * Map TikTok gift names/IDs to game gift tiers
+     * TikTok uses COINS not diamonds - 1 coin = 1 diamond value
      */
-    mapTikTokGift(giftName, giftId, diamondCount) {
-        // Map by diamond count (most reliable)
-        if (diamondCount >= 1000) {
-            return 'universe'; // EPIC tier
-        } else if (diamondCount >= 500) {
-            return 'galaxy'; // LARGE tier
-        } else if (diamondCount >= 50) {
-            return 'drama_queen'; // MEDIUM tier
+    mapTikTokGift(giftName, giftId, coinCount) {
+        // Map by coin count (TikTok uses coins, not diamonds)
+        // coinCount represents the total coin value of the gift
+        if (coinCount >= 1000) {
+            return 'universe'; // EPIC tier (1000+ coins)
+        } else if (coinCount >= 500) {
+            return 'galaxy'; // LARGE tier (500-999 coins)
+        } else if (coinCount >= 50) {
+            return 'drama_queen'; // MEDIUM tier (50-499 coins)
         } else {
-            return 'rose'; // SMALL tier
+            return 'rose'; // SMALL tier (1-49 coins)
         }
     }
     

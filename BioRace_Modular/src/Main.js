@@ -356,9 +356,8 @@ class Game {
         // Start background music
         this.audio.startMusic();
 
-        // --- Initial demo competitors ---
-        setTimeout(() => this.spawnRemotePlayer("Viewer_1", 0xff0050), 2000);
-        setTimeout(() => this.spawnRemotePlayer("Guest_X", 0x0088ff), 5000);
+        // NOTE: Demo/guest bots removed - only gifters spawn as competitors
+        // Players enter the race by sending TikTok gifts (50+ coins)
     }
     
     /**

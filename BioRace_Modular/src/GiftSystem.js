@@ -7,13 +7,15 @@ import { getGameState } from './GameState.js';
 /**
  * GiftSystem - Handles TikTok gift integration and effects
  * 
- * Gift Tiers:
- * - SMALL: Rose, TikTok (1-10 coins) - Minor boost
- * - MEDIUM: Drama Queen, GG (50-100 coins) - Speed boost + obstacle spawn
- * - LARGE: Galaxy (500+ coins) - Major effect + competitor spawn
- * - EPIC: Universe (1000+ coins) - All effects + power-up
+ * COIN-BASED SPAWNING:
+ * - 1 coin = 1 small item spawned
+ * - 10 coins = 10 items + mix of sizes
+ * - 50+ coins = many items + bigger obstacles + competitor
+ * - 500+ coins = massive spawn + multiple competitors
+ * - 1000+ coins = everything!
  * 
  * TikTok Gifters become COMPETITORS in the race!
+ * Only gifters spawn as competitors (no guests/test bots)
  */
 export class GiftSystem {
     constructor(world, player, obstacleManager = null) {
@@ -29,6 +31,9 @@ export class GiftSystem {
         this.onSpawnCompetitor = null;
         this.onSpawnObstacle = null;
         this.onSpawnPowerUp = null;
+        
+        // Obstacle types for spawning (smallest to largest)
+        this.obstacleTypes = ['BANANA', 'HAIRBRUSH', 'CUCUMBER', 'CONDOM', 'IUD'];
         
         // Gift tier definitions with enhanced rewards
         this.giftTiers = {
@@ -115,8 +120,12 @@ export class GiftSystem {
     
     setupTestKeys() {
         window.addEventListener('keydown', (e) => {
-            if (e.key === '9') this.triggerGift('rose', 'TestUser');
-            if (e.key === '0') this.triggerGift('universe', 'EpicGifter');
+            // Test keys for different coin values
+            if (e.key === '6') this.triggerGiftByCoins('Tester_1coin', 1, 1, 'rose');      // 1 coin = 1 small item
+            if (e.key === '7') this.triggerGiftByCoins('Tester_10coins', 10, 1, 'heart'); // 10 coins = 10 items
+            if (e.key === '8') this.triggerGiftByCoins('Tester_50coins', 50, 1, 'gg');    // 50 coins = competitor + items
+            if (e.key === '9') this.triggerGiftByCoins('Tester_500coins', 500, 1, 'galaxy'); // 500 coins = powerups + more
+            if (e.key === '0') this.triggerGiftByCoins('Tester_1000coins', 1000, 1, 'universe'); // 1000 coins = EVERYTHING
         });
     }
     
@@ -198,6 +207,189 @@ export class GiftSystem {
         if (this.giftQueue.length > 10) {
             this.giftQueue.shift();
         }
+    }
+    
+    /**
+     * Trigger gift effects based on coin value (NEW SYSTEM)
+     * - 1 coin = 1 item spawned
+     * - 10 coins = 10 items spawned (mix of sizes)
+     * - 50+ coins = competitor spawns + many items
+     * - 500+ coins = multiple competitors + massive spawn
+     * - 1000+ coins = everything!
+     * 
+     * @param {string} senderName - Name of the sender
+     * @param {number} totalCoins - Total coin value of the gift
+     * @param {number} repeatCount - How many times the gift was sent
+     * @param {string} giftName - Original gift name from TikTok
+     */
+    triggerGiftByCoins(senderName, totalCoins, repeatCount = 1, giftName = 'gift') {
+        // Determine tier based on coins
+        let tierName, tier, emoji, color;
+        
+        if (totalCoins >= 1000) {
+            tierName = 'EPIC';
+            emoji = '🚀';
+            color = 0xff00ff;
+        } else if (totalCoins >= 500) {
+            tierName = 'LARGE';
+            emoji = '🌟';
+            color = 0xffd700;
+        } else if (totalCoins >= 50) {
+            tierName = 'MEDIUM';
+            emoji = '✨';
+            color = 0x00ff88;
+        } else {
+            tierName = 'SMALL';
+            emoji = '🌹';
+            color = 0xff69b4;
+        }
+        
+        tier = this.giftTiers[tierName];
+        const giftConfig = CONFIG.GIFTS[tierName];
+        
+        // Log the gift
+        logEvent(`${emoji} ${totalCoins} COINS FROM:\n${senderName}\n${giftName.toUpperCase()} x${repeatCount}`);
+        
+        // Update gifter leaderboard
+        this.updateGifterLeaderboard(senderName, tierName, totalCoins);
+        
+        // Record gift in game state
+        this.gameState.giftReceived(totalCoins);
+        
+        // Apply boost to player (proportional to coins)
+        const boostCharges = Math.min(Math.floor(totalCoins / 5), 50); // Max 50 boosts
+        this.player.boostCharges += boostCharges;
+        
+        // Create visual effect
+        this.createGiftVisualEffect({ ...tier, emoji, color, coinValue: totalCoins }, senderName, tierName);
+        
+        // SPAWN ITEMS BASED ON COIN VALUE
+        this.spawnItemsByCoins(senderName, totalCoins);
+        
+        // Add to gift queue for tracking
+        this.giftQueue.push({
+            sender: senderName,
+            gift: giftName,
+            tier: tierName,
+            coins: totalCoins,
+            count: repeatCount,
+            time: Date.now()
+        });
+        
+        // Keep only last 10 gifts
+        if (this.giftQueue.length > 10) {
+            this.giftQueue.shift();
+        }
+    }
+    
+    /**
+     * Spawn items based on coin value
+     * The higher the coin value, the more and bigger items spawn
+     */
+    spawnItemsByCoins(senderName, totalCoins) {
+        // Calculate how many items to spawn (1 coin = 1 item, up to a max)
+        const baseItemCount = Math.min(totalCoins, 30); // Cap at 30 items
+        
+        // Distribute items across obstacle types based on coin value
+        // More coins = more of the bigger obstacles
+        const distribution = this.calculateItemDistribution(totalCoins, baseItemCount);
+        
+        let delay = 0;
+        
+        // Spawn small items first (BANANA, HAIRBRUSH)
+        for (let i = 0; i < distribution.small; i++) {
+            setTimeout(() => {
+                if (this.onSpawnObstacle) {
+                    const type = Math.random() > 0.5 ? 'BANANA' : 'HAIRBRUSH';
+                    this.obstacleManager?.spawn(type);
+                }
+            }, delay);
+            delay += 200;
+        }
+        
+        // Spawn medium items (CUCUMBER)
+        for (let i = 0; i < distribution.medium; i++) {
+            setTimeout(() => {
+                if (this.obstacleManager) {
+                    this.obstacleManager.spawn('CUCUMBER');
+                }
+            }, delay);
+            delay += 300;
+        }
+        
+        // Spawn large items (CONDOM, IUD) for bigger gifts
+        for (let i = 0; i < distribution.large; i++) {
+            setTimeout(() => {
+                if (this.obstacleManager) {
+                    const type = Math.random() > 0.5 ? 'CONDOM' : 'IUD';
+                    this.obstacleManager.spawn(type);
+                }
+            }, delay);
+            delay += 400;
+        }
+        
+        // Spawn competitor(s) for 50+ coins
+        if (totalCoins >= 50 && this.onSpawnCompetitor) {
+            const competitorCount = totalCoins >= 1000 ? 3 : totalCoins >= 500 ? 2 : 1;
+            for (let i = 0; i < competitorCount; i++) {
+                setTimeout(() => {
+                    // Add suffix for multiple competitors from same gifter
+                    const name = competitorCount > 1 ? `${senderName}_${i + 1}` : senderName;
+                    this.onSpawnCompetitor(name, this.getGifterColor(senderName + i));
+                }, i * 1000);
+            }
+            logEvent(`🏊 ${senderName} JOINS THE RACE!${competitorCount > 1 ? ` (x${competitorCount})` : ''}`);
+        }
+        
+        // Spawn power-ups for 500+ coins
+        if (totalCoins >= 500 && this.onSpawnPowerUp) {
+            const powerUpCount = totalCoins >= 1000 ? 3 : 1;
+            for (let i = 0; i < powerUpCount; i++) {
+                setTimeout(() => {
+                    this.onSpawnPowerUp();
+                }, i * 1500);
+            }
+            logEvent(`💊 POWER-UP${powerUpCount > 1 ? 'S' : ''} INCOMING!`);
+        }
+        
+        // Log spawn summary
+        const totalSpawned = distribution.small + distribution.medium + distribution.large;
+        if (totalSpawned > 0) {
+            logEvent(`⚠️ ${senderName} spawned ${totalSpawned} obstacles!`);
+        }
+    }
+    
+    /**
+     * Calculate item distribution based on coin value
+     */
+    calculateItemDistribution(totalCoins, maxItems) {
+        const distribution = { small: 0, medium: 0, large: 0 };
+        
+        if (totalCoins < 10) {
+            // 1-9 coins: only small items
+            distribution.small = Math.min(totalCoins, maxItems);
+        } else if (totalCoins < 50) {
+            // 10-49 coins: mostly small, some medium
+            distribution.small = Math.floor(maxItems * 0.7);
+            distribution.medium = Math.floor(maxItems * 0.3);
+        } else if (totalCoins < 500) {
+            // 50-499 coins: mix of all sizes
+            distribution.small = Math.floor(maxItems * 0.4);
+            distribution.medium = Math.floor(maxItems * 0.4);
+            distribution.large = Math.floor(maxItems * 0.2);
+        } else if (totalCoins < 1000) {
+            // 500-999 coins: more medium and large
+            distribution.small = Math.floor(maxItems * 0.3);
+            distribution.medium = Math.floor(maxItems * 0.4);
+            distribution.large = Math.floor(maxItems * 0.3);
+        } else {
+            // 1000+ coins: heavy on large items
+            distribution.small = Math.floor(maxItems * 0.2);
+            distribution.medium = Math.floor(maxItems * 0.3);
+            distribution.large = Math.floor(maxItems * 0.5);
+        }
+        
+        return distribution;
     }
     
     /**

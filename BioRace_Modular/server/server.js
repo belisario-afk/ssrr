@@ -126,7 +126,11 @@ async function connectToTikTok(username = CONFIG.TIKTOK_USERNAME) {
     
     // Gift event
     tiktokConnection.on('gift', data => {
-        console.log(`[TikTok] Gift: ${data.giftName} x${data.repeatCount} from ${data.uniqueId}`);
+        // TikTok sends diamondCount which represents coin value
+        const coinValue = data.diamondCount || 1;
+        const totalCoins = coinValue * (data.repeatCount || 1);
+        
+        console.log(`[TikTok] Gift: ${data.giftName} x${data.repeatCount} from ${data.uniqueId} (${totalCoins} coins total)`);
         
         broadcast({
             type: 'gift',
@@ -136,6 +140,8 @@ async function connectToTikTok(username = CONFIG.TIKTOK_USERNAME) {
             senderId: data.uniqueId,
             repeatCount: data.repeatCount,
             diamondCount: data.diamondCount,
+            coinValue: coinValue,          // Single gift coin value
+            totalCoins: totalCoins,        // Total coins (value * count)
             timestamp: Date.now()
         });
     });
