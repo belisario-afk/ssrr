@@ -5,6 +5,7 @@ import { clone as cloneWithSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 import { CONFIG } from './Config.js';
 import { logEvent } from './Utils.js';
 import { getAudioSystem } from './AudioSystem.js';
+import { getGameState } from './GameState.js';
 
 // Skin tone colors for swimmers
 const SKIN_TONES = [
@@ -61,9 +62,11 @@ function getSwimmerModel() {
 export class Player {
     constructor(world, options = {}) {
         this.world = world;
+        this.gameState = getGameState();
         
         // Options
         this.isRemote = options.isRemote || false;
+        this.isGifterCompetitor = options.isGifterCompetitor || false; // Smart AI for gifters
         this.color = options.color || CONFIG.PLAYER_COLOR;
         this.name = options.name || "Player";
         
@@ -71,8 +74,8 @@ export class Player {
         if (options.skinToneIndex !== undefined) {
             this.skinTone = SKIN_TONES[options.skinToneIndex % SKIN_TONES.length];
         } else if (this.isRemote) {
-            // Random skin tone for AI/remote players
-            this.skinTone = SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)];
+            // Remote players can use their assigned color (for gifters) or random skin tone
+            this.skinTone = options.color || SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)];
         } else {
             // Local player uses their selected color as a tint
             this.skinTone = this.color;
@@ -84,13 +87,25 @@ export class Player {
         this.modelMaterials = []; // Store references to model materials for color changes
 
         // Boost System
-        this.boostCharges = 0; // Starts empty!
+        this.boostCharges = this.isRemote ? 0 : CONFIG.GAME.startingBoost; // Start with some boost
         this.canBoost = true;
         this.boostTimer = 0;
         
-        // AI movement timer for smoother remote player movement
+        // AI movement for remote players
         this.aiMoveTimer = 0;
         this.aiTargetOffset = { x: 0, y: 0 };
+        this.aiDecisionTimer = 0;
+        this.aiCurrentDecision = 'forward'; // 'forward', 'dodge_left', 'dodge_right', 'chase_pill'
+        
+        // Smart AI state (for gifter competitors)
+        this.nearestObstacle = null;
+        this.nearestPill = null;
+        this.targetPillPosition = null;
+        
+        // Status effects
+        this.isStunned = false;
+        this.hasShield = false;
+        this.speedMultiplier = 1.0;
 
         // Physics Body
         const shape = new CANNON.Sphere(0.5);
@@ -111,7 +126,7 @@ export class Player {
         // Visual Group
         this.mesh = new THREE.Group();
         
-        // Load the animated swimmer model (required - no fallback)
+        // Load the animated swimmer model
         this.loadSwimmerModel();
         
         // Light attachment (Only for local player to save performance)
@@ -401,8 +416,11 @@ export class Player {
             return;
         }
         
+        // Get speed multiplier from game state or power-ups
+        const speedMult = this.isRemote ? CONFIG.AI.baseSpeed : (this.gameState.getSpeedMultiplier() * this.speedMultiplier);
+        
         // 1. Propulsion (Base Speed)
-        this.body.applyForce(new CANNON.Vec3(0, 0, -CONFIG.SPEED), this.body.position);
+        this.body.applyForce(new CANNON.Vec3(0, 0, -CONFIG.SPEED * speedMult), this.body.position);
 
         if (!this.isRemote) {
             // 2. Local Steering
@@ -425,27 +443,12 @@ export class Player {
                 }
             }
         } else {
-            // REMOTE / AI BEHAVIOR
-            // Smoother AI movement - change direction periodically instead of every frame
-            this.aiMoveTimer -= dt;
-            if (this.aiMoveTimer <= 0) {
-                // Pick a new target offset every 0.5-1.5 seconds
-                this.aiMoveTimer = 0.5 + Math.random() * 1.0;
-                this.aiTargetOffset = {
-                    x: (Math.random() - 0.5) * 8,
-                    y: (Math.random() - 0.5) * 8
-                };
+            // REMOTE / AI BEHAVIOR - Use smart AI for gifter competitors
+            if (this.isGifterCompetitor) {
+                this.updateSmartAI(dt);
+            } else {
+                this.updateBasicAI(dt);
             }
-            
-            // Apply smooth steering towards target offset
-            const steerX = this.aiTargetOffset.x - this.body.position.x;
-            const steerY = this.aiTargetOffset.y - this.body.position.y;
-            
-            this.body.applyForce(new CANNON.Vec3(
-                steerX * 0.5, 
-                steerY * 0.5, 
-                0
-            ), this.body.position);
         }
 
         // Timer Update
@@ -474,6 +477,152 @@ export class Player {
         if (this.mixer) {
             this.mixer.update(dt);
         }
+    }
+    
+    /**
+     * Basic AI - Simple random movement (for generic remote players)
+     */
+    updateBasicAI(dt) {
+        this.aiMoveTimer -= dt;
+        if (this.aiMoveTimer <= 0) {
+            this.aiMoveTimer = 0.5 + Math.random() * 1.0;
+            this.aiTargetOffset = {
+                x: (Math.random() - 0.5) * 8,
+                y: (Math.random() - 0.5) * 8
+            };
+        }
+        
+        const steerX = this.aiTargetOffset.x - this.body.position.x;
+        const steerY = this.aiTargetOffset.y - this.body.position.y;
+        
+        this.body.applyForce(new CANNON.Vec3(
+            steerX * 0.5, 
+            steerY * 0.5, 
+            0
+        ), this.body.position);
+    }
+    
+    /**
+     * Smart AI - For gifter competitors, actually competes!
+     * Dodges obstacles, chases pills, races competitively
+     */
+    updateSmartAI(dt) {
+        this.aiDecisionTimer -= dt;
+        
+        // Make decisions periodically
+        if (this.aiDecisionTimer <= 0) {
+            this.aiDecisionTimer = 0.3; // Faster decisions for smarter AI
+            this.makeSmartDecision();
+        }
+        
+        // Execute current decision
+        let targetX = 0;
+        let targetY = 0;
+        const force = CONFIG.STEER_FORCE * 0.8; // Slightly slower reaction than player
+        
+        switch(this.aiCurrentDecision) {
+            case 'dodge_left':
+                targetX = -CONFIG.TUNNEL_RADIUS * 0.6;
+                break;
+            case 'dodge_right':
+                targetX = CONFIG.TUNNEL_RADIUS * 0.6;
+                break;
+            case 'dodge_up':
+                targetY = CONFIG.TUNNEL_RADIUS * 0.6;
+                break;
+            case 'dodge_down':
+                targetY = -CONFIG.TUNNEL_RADIUS * 0.6;
+                break;
+            case 'chase_pill':
+                if (this.targetPillPosition) {
+                    targetX = this.targetPillPosition.x;
+                    targetY = this.targetPillPosition.y;
+                }
+                break;
+            case 'forward':
+            default:
+                // Slight random drift while moving forward
+                targetX = this.body.position.x + (Math.random() - 0.5) * 2;
+                targetY = this.body.position.y + (Math.random() - 0.5) * 2;
+                break;
+        }
+        
+        // Steer towards target
+        const steerX = (targetX - this.body.position.x) * 0.8;
+        const steerY = (targetY - this.body.position.y) * 0.8;
+        
+        this.body.applyForce(new CANNON.Vec3(
+            Math.sign(steerX) * Math.min(Math.abs(steerX), force), 
+            Math.sign(steerY) * Math.min(Math.abs(steerY), force), 
+            0
+        ), this.body.position);
+        
+        // Smart AI uses boost when chasing or dodging
+        if (this.canBoost && this.boostCharges > 0) {
+            if (this.aiCurrentDecision === 'chase_pill' || 
+                (this.nearestObstacle && this.nearestObstacle.distance < 10)) {
+                this.body.applyImpulse(new CANNON.Vec3(0, 0, -CONFIG.BOOST_FORCE * 0.5), this.body.position);
+                this.boostCharges--;
+                this.canBoost = false;
+                this.boostTimer = 1.0;
+            }
+        }
+    }
+    
+    /**
+     * Make a smart AI decision based on surroundings
+     */
+    makeSmartDecision() {
+        // Priority 1: Dodge nearby obstacles
+        if (this.nearestObstacle && this.nearestObstacle.distance < 20) {
+            if (Math.random() < CONFIG.AI.dodgeChance) {
+                // Dodge to the opposite side of the obstacle
+                const obs = this.nearestObstacle;
+                const myX = this.body.position.x;
+                const myY = this.body.position.y;
+                const obsX = obs.x;
+                const obsY = obs.y;
+                
+                // Choose dodge direction based on obstacle position
+                if (Math.abs(obsX - myX) > Math.abs(obsY - myY)) {
+                    // Dodge horizontally
+                    this.aiCurrentDecision = obsX > myX ? 'dodge_left' : 'dodge_right';
+                } else {
+                    // Dodge vertically
+                    this.aiCurrentDecision = obsY > myY ? 'dodge_down' : 'dodge_up';
+                }
+                return;
+            }
+        }
+        
+        // Priority 2: Chase nearby pills
+        if (this.nearestPill && this.nearestPill.distance < 15) {
+            if (Math.random() < CONFIG.AI.pillAttraction) {
+                this.aiCurrentDecision = 'chase_pill';
+                this.targetPillPosition = {
+                    x: this.nearestPill.x,
+                    y: this.nearestPill.y
+                };
+                return;
+            }
+        }
+        
+        // Default: Move forward with slight randomness
+        this.aiCurrentDecision = 'forward';
+    }
+    
+    /**
+     * Set nearest obstacle info (called from ObstacleManager)
+     */
+    setNearestObstacle(obstacleInfo) {
+        this.nearestObstacle = obstacleInfo;
+    }
+    
+    /**
+     * Set nearest pill info (called from ObstacleManager)
+     */
+    setNearestPill(pillInfo) {
+        this.nearestPill = pillInfo;
     }
 
     applyConstraints() {
