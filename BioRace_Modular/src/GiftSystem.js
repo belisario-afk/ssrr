@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as CANNON from 'cannon';
 import { logEvent } from './Utils.js';
 import { CONFIG } from './Config.js';
 
@@ -311,6 +312,3 @@ export class GiftSystem {
         this.triggerGift(giftName, senderName, repeatCount || 1);
     }
 }
-
-// Import CANNON for physics (need to add to imports)
-import * as CANNON from 'cannon';
