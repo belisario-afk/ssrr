@@ -57,10 +57,8 @@ export class GiftSystem {
     
     setupTestKeys() {
         window.addEventListener('keydown', (e) => {
-            if (e.key === '6') this.triggerGift('rose', 'TestUser');
-            if (e.key === '7') this.triggerGift('drama_queen', 'TestUser');
-            if (e.key === '8') this.triggerGift('galaxy', 'GalaxyGifter');
-            if (e.key === '9') this.triggerGift('universe', 'EpicGifter');
+            if (e.key === '9') this.triggerGift('rose', 'TestUser');
+            if (e.key === '0') this.triggerGift('universe', 'EpicGifter');
         });
     }
     
