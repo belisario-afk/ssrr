@@ -5,6 +5,58 @@ import { CONFIG } from './Config.js';
 import { logEvent } from './Utils.js';
 import { getAudioSystem } from './AudioSystem.js';
 
+// Skin tone colors for swimmers
+const SKIN_TONES = [
+    0xffdbac, // Light
+    0xf1c27d, // Fair
+    0xe0ac69, // Medium
+    0xc68642, // Tan
+    0x8d5524, // Brown
+    0x5c3317, // Dark Brown
+    0xffe0bd, // Peach
+    0xd4a574  // Caramel
+];
+
+// Shared GLTFLoader instance for all players
+let sharedLoader = null;
+let cachedSwimmerGLTF = null;
+let loadingPromise = null;
+
+/**
+ * Preload the swimmer model once for all players
+ */
+function getSwimmerModel() {
+    if (cachedSwimmerGLTF) {
+        return Promise.resolve(cachedSwimmerGLTF);
+    }
+    
+    if (loadingPromise) {
+        return loadingPromise;
+    }
+    
+    if (!sharedLoader) {
+        sharedLoader = new GLTFLoader();
+    }
+    
+    loadingPromise = new Promise((resolve, reject) => {
+        sharedLoader.load(
+            './models/swimmer.glb',
+            (gltf) => {
+                console.log('✓ Swimmer model loaded and cached');
+                cachedSwimmerGLTF = gltf;
+                resolve(gltf);
+            },
+            undefined,
+            (error) => {
+                console.error('Failed to load swimmer.glb:', error);
+                reject(error);
+            }
+        );
+    });
+    
+    return loadingPromise;
+}
+
 export class Player {
     constructor(world, options = {}) {
         this.world = world;
@@ -14,9 +66,21 @@ export class Player {
         this.color = options.color || CONFIG.PLAYER_COLOR;
         this.name = options.name || "Player";
         
+        // Assign a skin tone - use index if provided, otherwise random for remote players
+        if (options.skinToneIndex !== undefined) {
+            this.skinTone = SKIN_TONES[options.skinToneIndex % SKIN_TONES.length];
+        } else if (this.isRemote) {
+            // Random skin tone for AI/remote players
+            this.skinTone = SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)];
+        } else {
+            // Local player uses their selected color as a tint
+            this.skinTone = this.color;
+        }
+        
         // Animation mixer for GLB models
         this.mixer = null;
         this.animationActions = [];
+        this.modelMaterials = []; // Store references to model materials for color changes
 
         // Boost System
         this.boostCharges = 0; // Starts empty!
@@ -46,8 +110,8 @@ export class Player {
         // Visual Group
         this.mesh = new THREE.Group();
         
-        // Try to load custom swimmer model, fallback to procedural
-        this.loadCustomModel();
+        // Load the animated swimmer model (required - no fallback)
+        this.loadSwimmerModel();
         
         // Light attachment (Only for local player to save performance)
         if (!this.isRemote) {
@@ -72,28 +136,30 @@ export class Player {
     }
     
     /**
-     * Try to load custom animated swimmer GLB model
-     * Falls back to procedural mesh if not found
+     * Load the animated swimmer GLB model
+     * Uses shared cached model for performance
      */
-    loadCustomModel() {
-        const loader = new GLTFLoader();
-        loader.load(
-            './models/swimmer.glb',
-            (gltf) => {
-                console.log('✓ Loaded custom swimmer model');
-                const model = gltf.scene;
+    loadSwimmerModel() {
+        getSwimmerModel()
+            .then((gltf) => {
+                // Clone the scene for this player instance
+                const model = gltf.scene.clone();
                 
                 // Scale the model appropriately
                 model.scale.set(0.5, 0.5, 0.5);
                 
-                // Apply color tint to model materials
+                // Apply skin tone tint to model materials
+                const skinColor = new THREE.Color(this.skinTone);
                 model.traverse((child) => {
                     if (child.isMesh) {
-                        // Clone material to allow individual coloring
+                        // Clone material to allow individual coloring per player
                         child.material = child.material.clone();
-                        // Optionally tint with player color
+                        this.modelMaterials.push(child.material);
+                        
+                        // Apply skin tone color
                         if (child.material.color) {
-                            child.material.color.lerp(new THREE.Color(this.color), 0.3);
+                            // Blend the original material color with skin tone
+                            child.material.color.lerp(skinColor, 0.7);
                         }
                     }
                 });
@@ -101,7 +167,7 @@ export class Player {
                 this.mesh.add(model);
                 this.customModel = model;
                 
-                // Set up animations if present
+                // Set up animations if present (use original gltf animations)
                 if (gltf.animations && gltf.animations.length > 0) {
                     this.mixer = new THREE.AnimationMixer(model);
                     gltf.animations.forEach((clip) => {
@@ -109,77 +175,11 @@ export class Player {
                         action.play();
                         this.animationActions.push(action);
                     });
-                    console.log(`✓ Loaded ${gltf.animations.length} animation(s)`);
                 }
-            },
-            undefined,
-            (error) => {
-                console.log('Swimmer model not found, using procedural mesh');
-                this.createMesh();
-            }
-        );
-        
-        // Create procedural mesh as immediate fallback (will be hidden if GLB loads)
-        this.createMesh();
-    }
-
-    createMesh() {
-        // Head
-        const headGeo = new THREE.SphereGeometry(0.5, 32, 32);
-        const headMat = new THREE.MeshPhysicalMaterial({ 
-            color: this.color, // Use dynamic color
-            emissive: this.color,
-            emissiveIntensity: 0.2, // Lower intensity for darker colors to show
-            roughness: 0.1,
-            clearcoat: 1.0
-        });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.scale.set(1, 1, 1.8);
-        
-        // Store reference to material for dynamic color changing
-        this.headMaterial = headMat;
-        
-        this.mesh.add(head);
-
-        // Tail Shader
-        const tailVert = `
-            varying vec2 vUv; 
-            uniform float uTime; 
-            uniform float uSpeed;
-            void main() {
-                vUv = uv; 
-                vec3 p = position;
-                float freq = 20.0 + (uSpeed * 8.0);
-                float amp = (0.2 + uSpeed * 0.5) * uv.y; 
-                p.x += sin(uTime * freq + p.y * 5.0) * amp;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-            }
-        `;
-        const tailFrag = `
-            varying vec2 vUv; 
-            uniform vec3 uColor;
-            void main() { 
-                gl_FragColor = vec4(uColor, 0.9 * (1.0 - vUv.y)); 
-            }
-        `;
-        
-        this.tailMat = new THREE.ShaderMaterial({
-            uniforms: { 
-                uTime: { value: 0 }, 
-                uSpeed: { value: 0 },
-                uColor: { value: new THREE.Color(this.color) } // Tail matches body
-            },
-            vertexShader: tailVert,
-            fragmentShader: tailFrag,
-            transparent: true, 
-            side: THREE.DoubleSide
-        });
-
-        const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 3.5, 1, 32), this.tailMat);
-        tail.position.z = 0.8; 
-        tail.rotation.x = Math.PI/2; 
-        tail.geometry.translate(0, -1.75, 0); 
-        this.mesh.add(tail);
+            })
+            .catch((error) => {
+                console.warn('Swimmer model not available, players will be invisible until model loads');
+            });
     }
 
     addNameTag() {
@@ -204,17 +204,18 @@ export class Player {
         this.mesh.add(sprite);
     }
 
-    // Method to update color dynamically (for Menu selection)
+    // Method to update color/skin tone dynamically (for Menu selection)
     setColor(hexColor) {
         this.color = hexColor;
+        this.skinTone = hexColor;
         const colObj = new THREE.Color(hexColor);
-        if (this.headMaterial) {
-            this.headMaterial.color = colObj;
-            this.headMaterial.emissive = colObj;
-        }
-        if (this.tailMat) {
-            this.tailMat.uniforms.uColor.value = colObj;
-        }
+        
+        // Update all model materials with new skin tone
+        this.modelMaterials.forEach((material) => {
+            if (material.color) {
+                material.color.copy(colObj);
+            }
+        });
     }
 
     initInput() {
@@ -249,14 +250,26 @@ export class Player {
         this.body.position.z += amount;
         // Add knockback impulse
         this.body.velocity.z = amount * 2;
-        // Visual feedback - flash red
-        if (this.headMaterial) {
-            const originalColor = this.headMaterial.color.clone();
-            this.headMaterial.color.setHex(0xff0000);
-            this.headMaterial.emissive.setHex(0xff0000);
+        // Visual feedback - flash red on all model materials
+        if (this.modelMaterials.length > 0) {
+            const originalColors = this.modelMaterials.map(m => m.color ? m.color.clone() : null);
+            this.modelMaterials.forEach((material) => {
+                if (material.color) {
+                    material.color.setHex(0xff0000);
+                }
+                if (material.emissive) {
+                    material.emissive.setHex(0xff0000);
+                }
+            });
             setTimeout(() => {
-                this.headMaterial.color.copy(originalColor);
-                this.headMaterial.emissive.copy(originalColor);
+                this.modelMaterials.forEach((material, i) => {
+                    if (material.color && originalColors[i]) {
+                        material.color.copy(originalColors[i]);
+                    }
+                    if (material.emissive) {
+                        material.emissive.setHex(0x000000);
+                    }
+                });
             }, 200);
         }
         if(!this.isRemote) {
@@ -376,14 +389,8 @@ export class Player {
             const lookTarget = this.mesh.position.clone().add(this.body.velocity);
             this.mesh.lookAt(lookTarget);
         }
-
-        // 6. Tail Uniforms
-        if (this.tailMat) {
-            this.tailMat.uniforms.uTime.value = time;
-            this.tailMat.uniforms.uSpeed.value = this.body.velocity.length() * 0.05;
-        }
         
-        // 7. Update animation mixer for custom GLB models
+        // 6. Update animation mixer for GLB model
         if (this.mixer) {
             this.mixer.update(dt);
         }

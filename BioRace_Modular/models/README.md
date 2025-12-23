@@ -12,13 +12,18 @@ Place your `.glb` model files in this folder.
 | `iud.glb` | **HEAVY DAMAGE** | `4` | Setback 75m |
 | `hairbrush.glb` | **STUN** | `5` | Freezes 1.5 seconds |
 
-## Player Model (Optional)
+## Player Model (REQUIRED)
 
 | Model File | Description |
 |------------|-------------|
-| `swimmer.glb` | Custom animated swimmer model |
+| `swimmer.glb` | Animated swimmer model for ALL players |
 
-If `swimmer.glb` is present with animations, they will play automatically!
+**IMPORTANT:** The `swimmer.glb` model is required for all swimmers (local player and AI/remote players).
+
+- All swimmers use the same model with different **skin tone tints**
+- Animations play automatically if present in the GLB file
+- 8 different skin tones are applied randomly to remote/AI players
+- Local player's skin tone is based on their selected color
 
 ## Other Spawn Keys
 
