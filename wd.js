@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 // Simple working directory utility
-const path = require('path');
 
 function getWorkingDirectory() {
   return process.cwd();
