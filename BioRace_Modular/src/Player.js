@@ -137,7 +137,7 @@ export class Player {
     
     /**
      * Load the animated swimmer GLB model
-     * Uses shared cached model for performance
+     * Uses shared cached model for performance, falls back to procedural mesh
      */
     loadSwimmerModel() {
         getSwimmerModel()
@@ -164,6 +164,12 @@ export class Player {
                     }
                 });
                 
+                // Remove fallback mesh if it exists
+                if (this.fallbackMesh) {
+                    this.mesh.remove(this.fallbackMesh);
+                    this.fallbackMesh = null;
+                }
+                
                 this.mesh.add(model);
                 this.customModel = model;
                 
@@ -178,8 +184,61 @@ export class Player {
                 }
             })
             .catch((error) => {
-                console.warn('Swimmer model not available, players will be invisible until model loads');
+                console.warn('Swimmer model not available, using fallback procedural mesh');
+                this.createFallbackSwimmer();
             });
+    }
+    
+    /**
+     * Create a procedural swimmer mesh as fallback when GLB isn't available
+     */
+    createFallbackSwimmer() {
+        // Create a simple swimmer shape (head + body + tail)
+        const skinColor = new THREE.Color(this.skinTone);
+        
+        // Head (sphere)
+        const headGeom = new THREE.SphereGeometry(0.4, 16, 16);
+        const headMat = new THREE.MeshStandardMaterial({ 
+            color: skinColor, 
+            roughness: 0.6,
+            metalness: 0.1
+        });
+        const head = new THREE.Mesh(headGeom, headMat);
+        head.position.z = -0.3;
+        this.modelMaterials.push(headMat);
+        
+        // Body (elongated ellipsoid)
+        const bodyGeom = new THREE.SphereGeometry(0.35, 16, 16);
+        bodyGeom.scale(1, 1, 2);
+        const bodyMat = new THREE.MeshStandardMaterial({ 
+            color: skinColor, 
+            roughness: 0.6,
+            metalness: 0.1
+        });
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        body.position.z = 0.4;
+        this.modelMaterials.push(bodyMat);
+        
+        // Tail (cone shape)
+        const tailGeom = new THREE.ConeGeometry(0.2, 0.8, 8);
+        const tailMat = new THREE.MeshStandardMaterial({ 
+            color: skinColor.clone().multiplyScalar(0.8), 
+            roughness: 0.6,
+            metalness: 0.1
+        });
+        const tail = new THREE.Mesh(tailGeom, tailMat);
+        tail.rotation.x = Math.PI / 2;
+        tail.position.z = 1.2;
+        this.modelMaterials.push(tailMat);
+        
+        // Group them
+        const swimmerGroup = new THREE.Group();
+        swimmerGroup.add(head);
+        swimmerGroup.add(body);
+        swimmerGroup.add(tail);
+        
+        this.fallbackMesh = swimmerGroup;
+        this.mesh.add(swimmerGroup);
     }
 
     addNameTag() {
