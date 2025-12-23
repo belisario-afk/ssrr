@@ -29,11 +29,40 @@ export class ObstacleManager {
         
         // Collision radius for each model type (for better hit detection)
         this.collisionRadii = {
-            'CONDOM': 4,
-            'CUCUMBER': 3.5,
-            'BANANA': 2,
-            'IUD': 2.5,
-            'HAIRBRUSH': 2
+            'CONDOM': 5,
+            'CUCUMBER': 4,
+            'BANANA': 3,
+            'IUD': 3.5,
+            'HAIRBRUSH': 3
+        };
+        
+        // Movement behavior for each obstacle type
+        // 'straight' = moves toward player along Z axis, player must dodge to walls
+        // 'floating' = floats/drifts inside tube
+        this.movementTypes = {
+            'CONDOM': 'straight',
+            'CUCUMBER': 'straight',
+            'BANANA': 'straight',
+            'IUD': 'floating',
+            'HAIRBRUSH': 'floating'
+        };
+        
+        // Speed at which obstacles move toward player (negative Z)
+        this.obstacleSpeed = {
+            'CONDOM': 15,
+            'CUCUMBER': 20,
+            'BANANA': 18,
+            'IUD': 8,
+            'HAIRBRUSH': 10
+        };
+        
+        // Spin speed for each obstacle type
+        this.spinSpeed = {
+            'CONDOM': 0.5,
+            'CUCUMBER': 2,
+            'BANANA': 1.5,
+            'IUD': 1,
+            'HAIRBRUSH': 0.8
         };
         
         // Preload custom models
@@ -81,18 +110,31 @@ export class ObstacleManager {
     
     /**
      * Get a random spawn position INSIDE the tunnel
+     * For 'straight' obstacles: spawn in center area so player must dodge to walls
+     * For 'floating' obstacles: can spawn anywhere in tube
+     * @param {string} movementType - 'straight' or 'floating'
      * @returns {object} {x, y} coordinates within tunnel radius
      */
-    getSpawnPositionInTube() {
-        // Spawn within 80% of tunnel radius to ensure obstacles are visible and hittable
-        const maxRadius = CONFIG.TUNNEL_RADIUS * 0.7;
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * maxRadius;
-        
-        return {
-            x: Math.cos(angle) * distance,
-            y: Math.sin(angle) * distance
-        };
+    getSpawnPositionInTube(movementType = 'floating') {
+        if (movementType === 'straight') {
+            // Spawn in center area - player must move to walls to dodge
+            const maxRadius = CONFIG.TUNNEL_RADIUS * 0.3; // Only center 30%
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * maxRadius;
+            return {
+                x: Math.cos(angle) * distance,
+                y: Math.sin(angle) * distance
+            };
+        } else {
+            // Floating obstacles can spawn anywhere inside tube
+            const maxRadius = CONFIG.TUNNEL_RADIUS * 0.7;
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * maxRadius;
+            return {
+                x: Math.cos(angle) * distance,
+                y: Math.sin(angle) * distance
+            };
+        }
     }
     
     /**
@@ -160,8 +202,11 @@ export class ObstacleManager {
         let body;
         const spawnZ = this.player.body.position.z - 80;
         
-        // Get spawn position INSIDE the tube
-        const spawnPos = this.getSpawnPositionInTube();
+        // Get movement type for this obstacle
+        const movementType = this.movementTypes[type] || 'floating';
+        
+        // Get spawn position INSIDE the tube based on movement type
+        const spawnPos = this.getSpawnPositionInTube(movementType);
         let randX = spawnPos.x;
         let randY = spawnPos.y;
         
@@ -173,6 +218,10 @@ export class ObstacleManager {
         
         // Get collision radius for this model type (for better GLB collision)
         const collisionRadius = this.collisionRadii[type] || 2;
+        
+        // Get speeds for this obstacle type
+        const speed = this.obstacleSpeed[type] || 10;
+        const spin = this.spinSpeed[type] || 1;
 
         if (type === 'CONDOM') {
             // CONDOM - Stuns player for 2 seconds
@@ -406,16 +455,32 @@ export class ObstacleManager {
         }
 
         body.position.set(randX, randY, spawnZ);
-        if (type !== 'CONDOM' && type !== 'FALLEN' && type !== 'PILL') {
-             body.angularVelocity.set(Math.random()*3, Math.random()*3, Math.random()*3);
+        
+        // Set up movement based on type
+        if (movementType === 'straight') {
+            // Straight obstacles move toward player along Z axis with controlled spin
+            body.velocity.set(0, 0, speed); // Move toward player (positive Z)
+            body.angularVelocity.set(spin, spin * 0.5, 0); // Controlled spin around X/Y
+            body.linearDamping = 0; // No slowdown
+            body.angularDamping = 0.1;
+        } else if (type !== 'CONDOM' && type !== 'FALLEN' && type !== 'PILL') {
+            // Floating obstacles have gentle random movement and spin
+            body.angularVelocity.set(
+                (Math.random() - 0.5) * spin,
+                (Math.random() - 0.5) * spin,
+                (Math.random() - 0.5) * spin
+            );
+            body.linearDamping = 0.95;
         }
 
         this.world.physicsWorld.addBody(body);
         this.world.scene.add(group);
-        this.obstacles.push({ mesh: group, body: body, type: type });
+        this.obstacles.push({ mesh: group, body: body, type: type, movementType: movementType, speed: speed });
     }
 
     update() {
+        const tunnelRadius = CONFIG.TUNNEL_RADIUS * 0.95; // Keep obstacles inside tube
+        
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const o = this.obstacles[i];
             
@@ -426,10 +491,33 @@ export class ObstacleManager {
                 this.obstacles.splice(i, 1);
                 continue;
             }
+            
+            // Keep obstacles inside the tube (constrain X/Y position)
+            const pos = o.body.position;
+            const distFromCenter = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
+            if (distFromCenter > tunnelRadius) {
+                // Push back toward center
+                const angle = Math.atan2(pos.y, pos.x);
+                pos.x = Math.cos(angle) * tunnelRadius;
+                pos.y = Math.sin(angle) * tunnelRadius;
+                // Bounce velocity inward
+                o.body.velocity.x *= -0.5;
+                o.body.velocity.y *= -0.5;
+            }
+            
+            // For straight-moving obstacles, maintain constant forward velocity
+            if (o.movementType === 'straight') {
+                // Keep moving toward player at constant speed
+                o.body.velocity.z = o.speed;
+                // Constrain X/Y velocity to prevent drifting
+                o.body.velocity.x *= 0.9;
+                o.body.velocity.y *= 0.9;
+            }
 
             o.mesh.position.copy(o.body.position);
             o.mesh.quaternion.copy(o.body.quaternion);
 
+            // Remove obstacles that have passed the player
             if (o.mesh.position.z > this.player.body.position.z + 50) {
                 this.world.physicsWorld.removeBody(o.body);
                 this.world.scene.remove(o.mesh);

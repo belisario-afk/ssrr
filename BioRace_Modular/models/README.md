@@ -4,13 +4,18 @@ Place your `.glb` model files in this folder.
 
 ## Obstacle Models
 
-| Model File | Effect | Spawn Key | Damage |
-|------------|--------|-----------|--------|
-| `condom.glb` | **STUN** | `1` | Freezes 2 seconds |
-| `cucumber.glb` | **DAMAGE** | `2` | Setback 50m |
-| `banana.glb` | **SLIP** | `3` | Setback 25m |
-| `iud.glb` | **HEAVY DAMAGE** | `4` | Setback 75m |
-| `hairbrush.glb` | **STUN** | `5` | Freezes 1.5 seconds |
+| Model File | Effect | Spawn Key | Damage | Movement |
+|------------|--------|-----------|--------|----------|
+| `condom.glb` | **STUN** | `1` | Freezes 2 seconds | Straight |
+| `cucumber.glb` | **DAMAGE** | `2` | Setback 50m | Straight |
+| `banana.glb` | **SLIP** | `3` | Setback 25m | Straight |
+| `iud.glb` | **HEAVY DAMAGE** | `4` | Setback 75m | Floating |
+| `hairbrush.glb` | **STUN** | `5` | Freezes 1.5 seconds | Floating |
+
+## Movement Types
+
+- **Straight**: Obstacles come directly at the player down the center of the tube. Players must move to the walls to dodge!
+- **Floating**: Obstacles drift/float inside the tube with gentle movement and spin.
 
 ## Player Model (Optional - Fallback Available)
 
@@ -48,19 +53,19 @@ To adjust scales, edit `modelScales` in `src/Obstacles.js` or swimmer scale in `
 
 | Model | Collision Radius |
 |-------|-----------------|
-| Condom | 4 |
-| Cucumber | 3.5 |
-| Banana | 2 |
-| IUD | 2.5 |
-| Hairbrush | 2 |
+| Condom | 5 |
+| Cucumber | 4 |
+| Banana | 3 |
+| IUD | 3.5 |
+| Hairbrush | 3 |
 
 ## Collision Effects Summary
 
-- **CONDOM** (Key 1): Stuns the player for 2 seconds
-- **CUCUMBER** (Key 2): Deals damage, pushing back 50 meters
-- **BANANA** (Key 3): Slip damage, pushes back 25 meters
-- **IUD** (Key 4): Heavy damage, pushes back 75 meters
-- **HAIRBRUSH** (Key 5): Stuns the player for 1.5 seconds
+- **CONDOM** (Key 1): Stuns the player for 2 seconds (Straight movement)
+- **CUCUMBER** (Key 2): Deals damage, pushing back 50 meters (Straight movement)
+- **BANANA** (Key 3): Slip damage, pushes back 25 meters (Straight movement)
+- **IUD** (Key 4): Heavy damage, pushes back 75 meters (Floating)
+- **HAIRBRUSH** (Key 5): Stuns the player for 1.5 seconds (Floating)
 - **FALLEN** (Key 6): No damage, visual obstacle
 - **PILL** (Key 7): Power-up, gives +3 boost charges
 
@@ -83,7 +88,9 @@ To adjust scales, edit `modelScales` in `src/Obstacles.js` or swimmer scale in `
 
 ## Spawn Behavior
 
-All obstacles spawn **inside the tube** (within 70% of tunnel radius) to ensure they're visible and hittable by players.
+- **Straight obstacles** (Condom, Cucumber, Banana): Spawn in the center of the tube and come straight at the player. Players must move to the walls to dodge!
+- **Floating obstacles** (IUD, Hairbrush): Spawn anywhere inside the tube and float/drift with gentle spinning.
+- All obstacles are constrained to stay inside the tube.
 
 ## Troubleshooting
 
