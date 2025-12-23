@@ -536,4 +536,89 @@ export class ObstacleManager {
             }
         }
     }
+    
+    /**
+     * Set reference to remote players for obstacle awareness
+     */
+    setRemotePlayers(players) {
+        this.remotePlayers = players;
+    }
+    
+    /**
+     * Set reference to gifter competitors for obstacle awareness
+     */
+    setGifterCompetitors(competitors) {
+        this.gifterCompetitors = competitors;
+    }
+    
+    /**
+     * Spawn a random obstacle (used by gift system)
+     */
+    spawnRandomObstacle(gifterName = null) {
+        const types = ['CONDOM', 'CUCUMBER', 'BANANA', 'IUD', 'HAIRBRUSH'];
+        const randomType = types[Math.floor(Math.random() * types.length)];
+        this.spawn(randomType);
+        
+        if (gifterName) {
+            logEvent(`⚠️ ${gifterName} spawned ${randomType}!`);
+        }
+    }
+    
+    /**
+     * Spawn a power-up pill (used by gift system)
+     */
+    spawnPowerUp() {
+        this.spawn('PILL');
+    }
+    
+    /**
+     * Find the nearest obstacle to a position (for AI competitors)
+     */
+    findNearestObstacle(position) {
+        let nearest = null;
+        let nearestDist = Infinity;
+        
+        for (const obs of this.obstacles) {
+            // Only consider damaging obstacles
+            if (obs.type === 'PILL' || obs.type === 'FALLEN') continue;
+            
+            const dist = position.distanceTo(obs.body.position);
+            
+            // Only consider obstacles ahead
+            if (obs.body.position.z < position.z && dist < nearestDist) {
+                nearestDist = dist;
+                nearest = {
+                    position: obs.body.position.clone(),
+                    type: obs.type,
+                    distance: dist
+                };
+            }
+        }
+        
+        return nearest;
+    }
+    
+    /**
+     * Find the nearest pill to a position (for AI competitors)
+     */
+    findNearestPill(position) {
+        let nearest = null;
+        let nearestDist = Infinity;
+        
+        for (const obs of this.obstacles) {
+            if (obs.type !== 'PILL') continue;
+            
+            const dist = position.distanceTo(obs.body.position);
+            
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = {
+                    position: obs.body.position.clone(),
+                    distance: dist
+                };
+            }
+        }
+        
+        return nearest;
+    }
 }

@@ -13,6 +13,7 @@ import { SkinManager } from './Skins.js';
 import { ParticleEffects } from './ParticleEffects.js';
 import { getAudioSystem } from './AudioSystem.js';
 import { getGameState } from './GameState.js';
+import { TikTokConnector } from './TikTokConnector.js';
 
 class Game {
     constructor() {
@@ -332,6 +333,17 @@ class Game {
         this.giftSystem.onSpawnCompetitor = (name, color) => this.spawnGifterCompetitor(name, color);
         this.giftSystem.onSpawnObstacle = (gifterName) => this.obstacles.spawnRandomObstacle(gifterName);
         this.giftSystem.onSpawnPowerUp = () => this.obstacles.spawnPowerUp();
+        
+        // Initialize TikTok Connector
+        this.tiktokConnector = new TikTokConnector(this.giftSystem, this.obstacles);
+        this.tiktokConnector.onGift = (data) => {
+            logEvent(`🎁 ${data.senderName}\n${data.giftName} x${data.repeatCount}`);
+        };
+        this.tiktokConnector.onViewerJoin = (data) => {
+            logEvent(`👋 ${data.username} joined!`);
+        };
+        // Connect to TikTok LIVE (will show status in UI)
+        this.tiktokConnector.connect('lmohss');
         
         this.gameStarted = true;
         
