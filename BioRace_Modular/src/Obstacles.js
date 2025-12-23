@@ -309,8 +309,9 @@ export class ObstacleManager {
                 group.add(new THREE.Mesh(geo, mat));
             }
             // Use sphere collision for better GLB model detection
+            // Higher mass (like other straight obstacles) prevents physics from throwing it around
             const shape = new CANNON.Sphere(collisionRadius);
-            body = new CANNON.Body({ mass: 3, shape: shape });
+            body = new CANNON.Body({ mass: 5, shape: shape, fixedRotation: false });
             
             // Collision effect: MINOR DAMAGE
             body.addEventListener("collide", (e) => {
@@ -500,18 +501,28 @@ export class ObstacleManager {
                 const angle = Math.atan2(pos.y, pos.x);
                 pos.x = Math.cos(angle) * tunnelRadius;
                 pos.y = Math.sin(angle) * tunnelRadius;
-                // Bounce velocity inward
-                o.body.velocity.x *= -0.5;
-                o.body.velocity.y *= -0.5;
+                // Kill X/Y velocity completely for straight obstacles
+                if (o.movementType === 'straight') {
+                    o.body.velocity.x = 0;
+                    o.body.velocity.y = 0;
+                } else {
+                    // Bounce velocity inward for floating
+                    o.body.velocity.x *= -0.5;
+                    o.body.velocity.y *= -0.5;
+                }
             }
             
-            // For straight-moving obstacles, maintain constant forward velocity
+            // For straight-moving obstacles, maintain constant forward velocity and stable position
             if (o.movementType === 'straight') {
                 // Keep moving toward player at constant speed
                 o.body.velocity.z = o.speed;
-                // Constrain X/Y velocity to prevent drifting
-                o.body.velocity.x *= 0.9;
-                o.body.velocity.y *= 0.9;
+                // Strongly constrain X/Y velocity to prevent drifting/curving
+                o.body.velocity.x *= 0.5;
+                o.body.velocity.y *= 0.5;
+                // Keep angular velocity controlled (no wild spinning)
+                o.body.angularVelocity.x = Math.max(-2, Math.min(2, o.body.angularVelocity.x));
+                o.body.angularVelocity.y = Math.max(-2, Math.min(2, o.body.angularVelocity.y));
+                o.body.angularVelocity.z = Math.max(-1, Math.min(1, o.body.angularVelocity.z));
             }
 
             o.mesh.position.copy(o.body.position);
