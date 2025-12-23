@@ -20,14 +20,16 @@ Place your `.glb` model files in this folder.
 
 ## Model Scales (configured in code)
 
+All models are set to the same uniform scale (3x) for consistent sizing:
+
 | Model | Scale (x, y, z) |
 |-------|-----------------|
-| Condom | 2, 2, 2 |
-| Cucumber | 1.5, 1.5, 1.5 |
-| Vibrator | 1.5, 1.5, 1.5 |
-| Banana | 2, 2, 2 |
+| Condom | 3, 3, 3 |
+| Cucumber | 3, 3, 3 |
+| Vibrator | 3, 3, 3 |
+| Banana | 3, 3, 3 |
 | IUD | 3, 3, 3 |
-| Hairbrush | 1.5, 1.5, 1.5 |
+| Hairbrush | 3, 3, 3 |
 
 To adjust scales, edit `modelScales` in `src/Obstacles.js`.
 

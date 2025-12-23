@@ -18,14 +18,14 @@ export class ObstacleManager {
         // Cache for loaded models (clone from these)
         this.modelCache = {};
         
-        // Model scale configurations for each type
+        // Model scale configurations for each type (all same size as IUD)
         this.modelScales = {
-            'CONDOM': { x: 2, y: 2, z: 2 },
-            'CUCUMBER': { x: 1.5, y: 1.5, z: 1.5 },
-            'VIBRATOR': { x: 1.5, y: 1.5, z: 1.5 },
-            'BANANA': { x: 2, y: 2, z: 2 },
+            'CONDOM': { x: 3, y: 3, z: 3 },
+            'CUCUMBER': { x: 3, y: 3, z: 3 },
+            'VIBRATOR': { x: 3, y: 3, z: 3 },
+            'BANANA': { x: 3, y: 3, z: 3 },
             'IUD': { x: 3, y: 3, z: 3 },
-            'HAIRBRUSH': { x: 1.5, y: 1.5, z: 1.5 }
+            'HAIRBRUSH': { x: 3, y: 3, z: 3 }
         };
         
         // Preload custom models
