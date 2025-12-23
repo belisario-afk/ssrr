@@ -1,0 +1,15 @@
+{
+  "name": "ssrr",
+  "version": "1.0.0",
+  "description": "Simple working directory utility",
+  "main": "index.js",
+  "bin": {
+    "wd": "./wd.js"
+  },
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": ["wd", "working-directory", "cli"],
+  "author": "",
+  "license": "ISC"
+}
