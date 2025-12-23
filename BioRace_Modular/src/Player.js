@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneWithSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { CONFIG } from './Config.js';
 import { logEvent } from './Utils.js';
 import { getAudioSystem } from './AudioSystem.js';
@@ -142,24 +143,41 @@ export class Player {
     loadSwimmerModel() {
         getSwimmerModel()
             .then((gltf) => {
-                // Clone the scene for this player instance
-                const model = gltf.scene.clone();
+                // Clone the scene for this player instance using SkeletonUtils for proper skinned mesh cloning
+                let model;
+                try {
+                    // Use SkeletonUtils.clone for proper skinned mesh handling
+                    model = cloneWithSkeleton(gltf.scene);
+                } catch (e) {
+                    // Fallback to regular clone if SkeletonUtils fails
+                    console.warn('SkeletonUtils clone failed, using regular clone:', e);
+                    model = gltf.scene.clone();
+                }
                 
                 // Scale the model appropriately
                 model.scale.set(0.5, 0.5, 0.5);
+                
+                // Ensure the model is visible
+                model.visible = true;
+                model.traverse((child) => {
+                    child.visible = true;
+                    child.frustumCulled = false; // Prevent culling issues
+                });
                 
                 // Apply skin tone tint to model materials
                 const skinColor = new THREE.Color(this.skinTone);
                 model.traverse((child) => {
                     if (child.isMesh) {
                         // Clone material to allow individual coloring per player
-                        child.material = child.material.clone();
-                        this.modelMaterials.push(child.material);
-                        
-                        // Apply skin tone color
-                        if (child.material.color) {
-                            // Blend the original material color with skin tone
-                            child.material.color.lerp(skinColor, 0.7);
+                        if (child.material) {
+                            child.material = child.material.clone();
+                            this.modelMaterials.push(child.material);
+                            
+                            // Apply skin tone color
+                            if (child.material.color) {
+                                // Blend the original material color with skin tone
+                                child.material.color.lerp(skinColor, 0.7);
+                            }
                         }
                     }
                 });
@@ -173,6 +191,8 @@ export class Player {
                 this.mesh.add(model);
                 this.customModel = model;
                 
+                console.log('Swimmer model added to player mesh');
+                
                 // Set up animations if present (use original gltf animations)
                 if (gltf.animations && gltf.animations.length > 0) {
                     this.mixer = new THREE.AnimationMixer(model);
@@ -181,10 +201,11 @@ export class Player {
                         action.play();
                         this.animationActions.push(action);
                     });
+                    console.log(`Playing ${gltf.animations.length} animation(s)`);
                 }
             })
             .catch((error) => {
-                console.warn('Swimmer model not available, using fallback procedural mesh');
+                console.warn('Swimmer model not available, using fallback procedural mesh:', error);
                 this.createFallbackSwimmer();
             });
     }
