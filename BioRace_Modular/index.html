@@ -6,7 +6,7 @@
     <title>Bio-Runner: Multiplayer Edition</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* --- NEW MENU STYLES --- */
+        /* --- MENU STYLES --- */
         #main-menu {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(10, 0, 0, 0.9);
@@ -19,7 +19,28 @@
             color: white;
         }
         
-        h1 { font-size: 60px; margin-bottom: 10px; color: #ff3366; text-shadow: 0 0 20px #ff0000; text-transform: uppercase; letter-spacing: 5px; }
+        h1 { 
+            font-size: 60px; 
+            margin-bottom: 10px; 
+            color: #ff3366; 
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000; 
+            text-transform: uppercase; 
+            letter-spacing: 5px;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000; }
+            50% { text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000, 0 0 80px #ff3366; }
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            letter-spacing: 4px;
+            opacity: 0.7;
+            margin-bottom: 30px;
+            color: #ff9999;
+        }
         
         .menu-box {
             background: rgba(255,255,255,0.05);
@@ -27,19 +48,49 @@
             border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.1);
             text-align: center;
-            width: 400px;
+            width: 450px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .section-title {
+            font-size: 12px; 
+            opacity: 0.7; 
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            color: #ffcccc;
         }
 
-        .color-picker { margin: 20px 0; display: flex; justify-content: center; gap: 10px; }
-        .swatch { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
-        .swatch:hover { transform: scale(1.2); border-color: white; }
-        .swatch.selected { box-shadow: 0 0 15px white; border-color: white; transform: scale(1.1); }
+        .color-picker { margin: 15px 0 25px 0; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+        .swatch { 
+            width: 45px; 
+            height: 45px; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            border: 3px solid rgba(255,255,255,0.2); 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .swatch:hover { transform: scale(1.15); border-color: white; box-shadow: 0 0 20px currentColor; }
+        .swatch.selected { 
+            box-shadow: 0 0 20px white, 0 0 30px currentColor; 
+            border-color: white; 
+            transform: scale(1.1);
+        }
+        .swatch.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            text-shadow: 0 0 5px black;
+        }
 
         #start-btn {
             background: linear-gradient(45deg, #ff0050, #ff0000);
             color: white;
             border: none;
-            padding: 15px 50px;
+            padding: 18px 60px;
             font-size: 24px;
             font-weight: bold;
             border-radius: 50px;
@@ -47,10 +98,93 @@
             box-shadow: 0 0 30px rgba(255,0,0,0.4);
             transition: all 0.3s;
             text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        #start-btn:hover { transform: scale(1.05); box-shadow: 0 0 50px rgba(255,0,0,0.8); }
+        #start-btn:hover { 
+            transform: scale(1.05); 
+            box-shadow: 0 0 50px rgba(255,0,0,0.8);
+            background: linear-gradient(45deg, #ff1060, #ff2010);
+        }
+        
+        /* Settings Toggle Button */
+        .settings-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .settings-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        /* Controls Help */
+        .controls-help {
+            margin-top: 25px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .controls-help .key {
+            display: inline-block;
+            background: rgba(255,255,255,0.15);
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin: 0 2px;
+            font-weight: bold;
+            color: white;
+        }
 
-        .lobby-info { margin-top: 20px; font-size: 12px; color: #888; }
+        .lobby-info { 
+            margin-top: 25px; 
+            font-size: 12px; 
+            color: #888;
+            line-height: 1.6;
+        }
+        .lobby-info .status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: blink 1.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Gift Test Info */
+        .gift-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(255,100,150,0.1), rgba(255,200,100,0.1));
+            border-radius: 10px;
+            border: 1px solid rgba(255,150,100,0.2);
+        }
+        .gift-info-title {
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #ffaa88;
+            margin-bottom: 8px;
+        }
+        .gift-keys {
+            font-size: 11px;
+            color: #aaa;
+            line-height: 1.8;
+        }
+        .gift-keys span {
+            color: #ff9966;
+        }
     </style>
 </head>
 <body>
@@ -58,23 +192,44 @@
     <!-- MAIN MENU -->
     <div id="main-menu">
         <h1>Bio-Race</h1>
+        <div class="subtitle">THE ULTIMATE CELLULAR JOURNEY</div>
+        
         <div class="menu-box">
-            <div style="font-size: 14px; opacity: 0.7; letter-spacing: 2px;">SELECT GENETIC MARKER</div>
+            <div class="section-title">SELECT YOUR GENETIC MARKER</div>
             
             <!-- Color Selection -->
             <div class="color-picker" id="color-picker">
-                <div class="swatch selected" style="background: #ffffff;" data-color="0xffffff"></div>
-                <div class="swatch" style="background: #00ff88;" data-color="0x00ff88"></div>
-                <div class="swatch" style="background: #ff0050;" data-color="0xff0050"></div>
-                <div class="swatch" style="background: #0088ff;" data-color="0x0088ff"></div>
-                <div class="swatch" style="background: #ffff00;" data-color="0xffff00"></div>
+                <div class="swatch selected" style="background: #ffffff;" data-color="0xffffff" title="Pure White"></div>
+                <div class="swatch" style="background: #00ff88;" data-color="0x00ff88" title="Bio Green"></div>
+                <div class="swatch" style="background: #ff0050;" data-color="0xff0050" title="Hot Pink"></div>
+                <div class="swatch" style="background: #0088ff;" data-color="0x0088ff" title="Electric Blue"></div>
+                <div class="swatch" style="background: #ffff00;" data-color="0xffff00" title="Golden"></div>
+                <div class="swatch" style="background: #ff8800;" data-color="0xff8800" title="Orange"></div>
+                <div class="swatch" style="background: #aa00ff;" data-color="0xaa00ff" title="Purple"></div>
+                <div class="swatch" style="background: #00ffff;" data-color="0x00ffff" title="Cyan"></div>
             </div>
 
-            <button id="start-btn">DEPLOY CELL</button>
+            <button id="start-btn">🧬 DEPLOY CELL</button>
+            
+            <div class="controls-help">
+                <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move
+                &nbsp;&nbsp;|&nbsp;&nbsp;
+                <span class="key">SPACE</span> Boost (requires energy)
+            </div>
+            
+            <div class="gift-info">
+                <div class="gift-info-title">🎁 GIFT TRIGGERS (TEST MODE)</div>
+                <div class="gift-keys">
+                    <span>6</span> = Rose Gift &nbsp;|&nbsp;
+                    <span>7</span> = Drama Queen &nbsp;|&nbsp;
+                    <span>8</span> = Galaxy &nbsp;|&nbsp;
+                    <span>9</span> = Universe
+                </div>
+            </div>
             
             <div class="lobby-info">
-                TIKTOK LIVE MULTIPLAYER READY<br>
-                WAITING FOR VIEWERS...
+                <span class="status"></span>TIKTOK LIVE MULTIPLAYER READY<br>
+                WAITING FOR VIEWERS TO JOIN...
             </div>
         </div>
     </div>
@@ -85,17 +240,31 @@
             <div class="label">DISTANCE TO TARGET</div>
             <div id="distance">5000m</div>
             <div id="progress-container"><div id="progress-bar"></div></div>
+            <div id="boost-display" class="boost-meter">
+                <div class="label" style="margin-top: 15px;">BOOST ENERGY</div>
+                <div id="boost-charges">⚡ 0</div>
+            </div>
         </div>
         <div class="hud-panel right">
             <div class="label">MULTIPLAYER FEED</div>
             <div id="event-log">WAITING FOR GIFTS...</div>
         </div>
     </div>
+    
+    <!-- Controls Hint (in-game) -->
+    <div id="controls-hint">
+        <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> to move
+        &nbsp;|&nbsp;
+        <span class="key">SPACE</span> to boost
+        &nbsp;|&nbsp;
+        <span class="key">1-5</span> spawn obstacles
+    </div>
 
     <!-- WIN SCREEN -->
     <div id="win-screen">
-        <div id="win-text">TARGET FERTILIZED</div>
-        <button id="restart-btn" onclick="location.reload()">RESTART</button>
+        <div id="win-text">🎉 TARGET FERTILIZED 🎉</div>
+        <div id="win-subtitle">MISSION COMPLETE</div>
+        <button id="restart-btn" onclick="location.reload()">🔄 RESTART RACE</button>
     </div>
 
     <script type="importmap">

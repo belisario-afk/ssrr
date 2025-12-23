@@ -7,7 +7,11 @@ import { CONFIG } from './Config.js';
 import { World } from './World.js';
 import { Player } from './Player.js';
 import { ObstacleManager } from './Obstacles.js';
-import { updateUI } from './Utils.js';
+import { updateUI, updateBoostDisplay } from './Utils.js';
+import { GiftSystem } from './GiftSystem.js';
+import { SkinManager } from './Skins.js';
+import { ParticleEffects } from './ParticleEffects.js';
+import { getAudioSystem } from './AudioSystem.js';
 
 class Game {
     constructor() {
@@ -16,6 +20,12 @@ class Game {
         this.gameStarted = false;
         this.active = true;
         this.remotePlayers = []; // Store viewer players
+        
+        // Initialize new systems
+        this.skinManager = new SkinManager();
+        this.skinManager.loadEquipped();
+        this.particleEffects = new ParticleEffects(this.world);
+        this.audio = getAudioSystem();
 
         this.setupPostProcessing();
         this.setupMenu();
@@ -48,8 +58,31 @@ class Game {
             isRemote: false 
         });
         
+        // Apply skin customizations
+        this.skinManager.applySkinToPlayer(this.player);
+        
+        // Create player trail if skin has trail
+        if (this.skinManager.currentSkin.trail !== 'none') {
+            const trailData = this.skinManager.getShopItems('TRAILS').find(
+                t => t.id === this.skinManager.currentSkin.trail
+            );
+            if (trailData) {
+                this.particleEffects.createTrailSystem(this.player, {
+                    color: trailData.particleColor || this.selectedColor,
+                    rainbow: trailData.rainbow
+                });
+            }
+        }
+        
         this.obstacles = new ObstacleManager(this.world, this.player);
+        
+        // Initialize Gift System
+        this.giftSystem = new GiftSystem(this.world, this.player);
+        
         this.gameStarted = true;
+        
+        // Start background music
+        this.audio.startMusic();
 
         // --- MULTIPLAYER TEST (Simulate Viewers Joining) ---
         // In a real app, this would be triggered by a WebSocket event
@@ -108,16 +141,31 @@ class Game {
 
         // 4. Obstacles Update
         this.obstacles.update();
+        
+        // 5. Gift System Update
+        if (this.giftSystem) {
+            this.giftSystem.update(dt);
+        }
+        
+        // 6. Particle Effects Update
+        this.particleEffects.update(dt);
+        
+        // 7. Skin Effects Update (aura pulsing, etc.)
+        this.skinManager.updateEffects(this.player, time);
 
-        // 5. Camera Follow (Local Player)
+        // 8. Camera Follow (Local Player)
         const target = this.player.mesh.position.clone().add(new THREE.Vector3(0, 4, 12));
         this.world.camera.position.lerp(target, 0.1);
         this.world.camera.lookAt(this.player.mesh.position);
 
-        // 6. UI & Win State
+        // 9. UI & Win State
         const remaining = updateUI(this.player.body.position.z, CONFIG.COURSE_LENGTH);
+        updateBoostDisplay(this.player.boostCharges);
+        
         if (remaining <= 30) {
             this.active = false;
+            this.audio.playSFX('win');
+            this.audio.stopMusic();
             document.getElementById('win-screen').style.display = 'flex';
         }
 

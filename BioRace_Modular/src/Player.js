@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon';
 import { CONFIG } from './Config.js';
 import { logEvent } from './Utils.js';
+import { getAudioSystem } from './AudioSystem.js';
 
 export class Player {
     constructor(world, options = {}) {
@@ -170,7 +171,10 @@ export class Player {
     // Called by ObstacleManager when Pill is hit
     refillBoost() {
         this.boostCharges += 3; // Add 3 boosts
-        if(!this.isRemote) logEvent(`ENERGY RESTORED!\nCHARGES: ${this.boostCharges}`);
+        if(!this.isRemote) {
+            logEvent(`ENERGY RESTORED!\nCHARGES: ${this.boostCharges}`);
+            getAudioSystem().playSFX('pickup');
+        }
     }
 
     update(dt, time) {
@@ -192,6 +196,9 @@ export class Player {
                     this.canBoost = false;
                     this.boostTimer = 0.5; // Short cooldown to prevent double-fire
                     logEvent(`BOOSTING! (${this.boostCharges} LEFT)`);
+                    
+                    // Play boost sound
+                    getAudioSystem().playSFX('boost');
                 }
             }
         } else {
