@@ -268,12 +268,15 @@ wss.on('connection', (ws) => {
     }));
 });
 
-// Start HTTP server for static files (optional, use nginx in production)
-if (process.env.SERVE_STATIC !== 'false') {
+// Start HTTP server for static files (disabled by default when using nginx)
+// Set SERVE_STATIC=true to enable the built-in static file server
+if (process.env.SERVE_STATIC === 'true') {
     httpServer.listen(CONFIG.STATIC_PORT, () => {
         console.log(`[Server] Static file server started on port ${CONFIG.STATIC_PORT}`);
         console.log(`[Server] Game available at http://165.22.174.250:${CONFIG.STATIC_PORT}`);
     });
+} else {
+    console.log('[Server] Static file server disabled (using Nginx)');
 }
 
 // Initial TikTok connection
