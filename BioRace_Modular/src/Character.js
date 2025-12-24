@@ -27,7 +27,9 @@ const SKIN_TONES = [
 // Shared GLTFLoader instance
 let sharedLoader = null;
 let cachedCharacterGLTF = null;
-let loadingPromise = null;
+let cachedSwimmerGLTF = null;
+let characterLoadingPromise = null;
+let swimmerLoadingPromise = null;
 
 /**
  * Preload the character model once for all players
@@ -37,15 +39,15 @@ function getCharacterModel() {
         return Promise.resolve(cachedCharacterGLTF);
     }
     
-    if (loadingPromise) {
-        return loadingPromise;
+    if (characterLoadingPromise) {
+        return characterLoadingPromise;
     }
     
     if (!sharedLoader) {
         sharedLoader = new GLTFLoader();
     }
     
-    loadingPromise = new Promise((resolve, reject) => {
+    characterLoadingPromise = new Promise((resolve, reject) => {
         sharedLoader.load(
             './models/character.glb',
             (gltf) => {
@@ -61,7 +63,42 @@ function getCharacterModel() {
         );
     });
     
-    return loadingPromise;
+    return characterLoadingPromise;
+}
+
+/**
+ * Preload the swimmer model for use as head
+ */
+function getSwimmerModel() {
+    if (cachedSwimmerGLTF) {
+        return Promise.resolve(cachedSwimmerGLTF);
+    }
+    
+    if (swimmerLoadingPromise) {
+        return swimmerLoadingPromise;
+    }
+    
+    if (!sharedLoader) {
+        sharedLoader = new GLTFLoader();
+    }
+    
+    swimmerLoadingPromise = new Promise((resolve, reject) => {
+        sharedLoader.load(
+            './models/swimmer.glb',
+            (gltf) => {
+                console.log('✓ Swimmer model (for head) loaded and cached');
+                cachedSwimmerGLTF = gltf;
+                resolve(gltf);
+            },
+            undefined,
+            (error) => {
+                console.log('Swimmer.glb not found for head, using procedural sphere');
+                reject(error);
+            }
+        );
+    });
+    
+    return swimmerLoadingPromise;
 }
 
 export class Character {
@@ -237,6 +274,7 @@ export class Character {
     
     /**
      * Create a procedural humanoid character with body, arms, legs
+     * Uses swimmer.glb as the head if available
      */
     createProceduralCharacter() {
         const skinColor = new THREE.Color(this.skinTone);
@@ -257,21 +295,67 @@ export class Character {
         });
         this.modelMaterials.push(skinMat, clothMat);
         
-        // HEAD
-        const headGeom = new THREE.SphereGeometry(0.35, 16, 16);
-        const head = new THREE.Mesh(headGeom, skinMat);
-        head.position.y = 2.0;
-        humanoid.add(head);
+        // HEAD - Try to load swimmer.glb as head, otherwise use procedural sphere
+        const headGroup = new THREE.Group();
+        headGroup.position.y = 2.0;
+        humanoid.add(headGroup);
+        this.headGroup = headGroup;
         
-        // Eyes
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
-        const eyeGeom = new THREE.SphereGeometry(0.06, 8, 8);
-        const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
-        leftEye.position.set(-0.1, 2.05, 0.3);
-        humanoid.add(leftEye);
-        const rightEye = new THREE.Mesh(eyeGeom, eyeMat);
-        rightEye.position.set(0.1, 2.05, 0.3);
-        humanoid.add(rightEye);
+        // Try to load swimmer.glb as the head
+        getSwimmerModel()
+            .then((gltf) => {
+                let head;
+                try {
+                    head = cloneWithSkeleton(gltf.scene);
+                } catch (e) {
+                    head = gltf.scene.clone();
+                }
+                
+                // Scale swimmer to fit as head
+                head.scale.set(0.8, 0.8, 0.8);
+                head.rotation.x = Math.PI / 2; // Rotate to face forward
+                
+                // Apply skin tone
+                head.traverse((child) => {
+                    if (child.isMesh) {
+                        child.visible = true;
+                        child.frustumCulled = false;
+                        if (child.material) {
+                            child.material = child.material.clone();
+                            this.modelMaterials.push(child.material);
+                            if (child.material.color) {
+                                child.material.color.lerp(skinColor, 0.6);
+                            }
+                        }
+                    }
+                });
+                
+                // Remove procedural head if present
+                if (this.proceduralHead) {
+                    headGroup.remove(this.proceduralHead);
+                }
+                
+                headGroup.add(head);
+                this.swimmerHead = head;
+                console.log('✓ Swimmer.glb used as character head');
+            })
+            .catch((error) => {
+                // Fallback to procedural sphere head
+                const headGeom = new THREE.SphereGeometry(0.35, 16, 16);
+                const head = new THREE.Mesh(headGeom, skinMat);
+                headGroup.add(head);
+                this.proceduralHead = head;
+                
+                // Add eyes for procedural head
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+                const eyeGeom = new THREE.SphereGeometry(0.06, 8, 8);
+                const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
+                leftEye.position.set(-0.1, 0.05, 0.3);
+                headGroup.add(leftEye);
+                const rightEye = new THREE.Mesh(eyeGeom, eyeMat);
+                rightEye.position.set(0.1, 0.05, 0.3);
+                headGroup.add(rightEye);
+            });
         
         // TORSO (Body)
         const torsoGeom = new THREE.BoxGeometry(0.8, 1.0, 0.4);
@@ -361,9 +445,9 @@ export class Character {
         this.fallbackMesh = humanoid;
         this.mesh.add(humanoid);
         
-        // Store limb references for animation
+        // Store limb references for animation (head is in headGroup, handled separately)
         this.limbs = {
-            head,
+            headGroup: this.headGroup,
             torso,
             leftUpperArm, leftLowerArm, leftHand,
             rightUpperArm, rightLowerArm, rightHand,

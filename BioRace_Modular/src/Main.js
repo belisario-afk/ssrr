@@ -5,8 +5,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
 import { CONFIG } from './Config.js';
 import { World } from './World.js';
+import { GutsWorld } from './GutsWorld.js';
 import { Player } from './Player.js';
+import { Character } from './Character.js';
 import { ObstacleManager } from './Obstacles.js';
+import { CombatSystem } from './CombatSystem.js';
 import { updateUI, updateBoostDisplay, logEvent } from './Utils.js';
 import { GiftSystem } from './GiftSystem.js';
 import { SkinManager } from './Skins.js';
@@ -17,7 +20,16 @@ import { TikTokConnector } from './TikTokConnector.js';
 
 class Game {
     constructor() {
-        this.world = new World();
+        // Game mode: 'race' (classic) or 'combat' (new)
+        this.gameMode = localStorage.getItem('biorace-game-mode') || 'race';
+        
+        // Create appropriate world based on game mode
+        if (this.gameMode === 'combat') {
+            this.world = new GutsWorld();
+        } else {
+            this.world = new World();
+        }
+        
         this.clock = new THREE.Clock();
         this.gameStarted = false;
         this.active = true;
@@ -300,11 +312,28 @@ class Game {
         };
         this.gameState.onPowerUpChange = (type, active, config) => this.updatePowerUpDisplay(type, active, config);
         
-        // Initialize Player with Selected Color
-        this.player = new Player(this.world, { 
-            color: this.selectedColor, 
-            isRemote: false 
-        });
+        // Initialize Player based on game mode
+        if (this.gameMode === 'combat') {
+            // Combat mode - use Character with swimmer.glb as head
+            this.player = new Character(this.world, { 
+                color: this.selectedColor, 
+                isRemote: false 
+            });
+            
+            // Initialize combat system
+            this.combatSystem = new CombatSystem(this.world, this.player);
+            
+            // Give player a starting weapon
+            this.player.equipWeapon('sword');
+            
+            logEvent('⚔️ COMBAT MODE\nPress J to attack!\nK to block');
+        } else {
+            // Race mode - use classic Player (swimmer)
+            this.player = new Player(this.world, { 
+                color: this.selectedColor, 
+                isRemote: false 
+            });
+        }
         
         // Apply skin customizations
         this.skinManager.applySkinToPlayer(this.player);
@@ -376,17 +405,36 @@ class Game {
             return;
         }
         
-        const competitor = new Player(this.world, {
-            name: name,
-            color: color,
-            isRemote: true,
-            isGifterCompetitor: true, // Smart AI!
-            startPos: { 
-                x: (Math.random() - 0.5) * 10, 
-                y: (Math.random() - 0.5) * 10, 
-                z: this.player.body.position.z - 20 // Start behind player
-            }
-        });
+        // Use Character in combat mode, Player in race mode
+        let competitor;
+        if (this.gameMode === 'combat') {
+            competitor = new Character(this.world, {
+                name: name,
+                color: color,
+                isRemote: true,
+                isGifterCompetitor: true,
+                startPos: { 
+                    x: (Math.random() - 0.5) * 10, 
+                    y: 0, // Ground level for combat
+                    z: this.player.body.position.z - 20
+                }
+            });
+            // Give AI competitor a random weapon
+            const weapons = ['sword', 'gun'];
+            competitor.equipWeapon(weapons[Math.floor(Math.random() * weapons.length)]);
+        } else {
+            competitor = new Player(this.world, {
+                name: name,
+                color: color,
+                isRemote: true,
+                isGifterCompetitor: true, // Smart AI!
+                startPos: { 
+                    x: (Math.random() - 0.5) * 10, 
+                    y: (Math.random() - 0.5) * 10, 
+                    z: this.player.body.position.z - 20 // Start behind player
+                }
+            });
+        }
         
         // Give gifter competitors some boost charges
         competitor.boostCharges = 2;
@@ -667,21 +715,37 @@ class Game {
         
         // 9. Skin Effects Update (aura pulsing, etc.)
         this.skinManager.updateEffects(this.player, time);
+        
+        // 10. Combat System Update (if in combat mode)
+        if (this.gameMode === 'combat' && this.combatSystem) {
+            this.combatSystem.update(dt);
+            
+            // Check combat between player and competitors
+            this.checkCombatCollisions();
+        }
 
-        // 10. Camera Follow (Local Player) with shake
-        const target = this.player.mesh.position.clone().add(new THREE.Vector3(0, 4, 12));
-        this.world.camera.position.lerp(target, 0.1);
-        this.world.camera.lookAt(this.player.mesh.position);
+        // 11. Camera Follow (Local Player) with shake
+        if (this.gameMode === 'combat') {
+            // Third-person camera for combat mode
+            const target = this.player.mesh.position.clone().add(new THREE.Vector3(0, 6, 15));
+            this.world.camera.position.lerp(target, 0.08);
+            this.world.camera.lookAt(this.player.mesh.position);
+        } else {
+            // Racing camera
+            const target = this.player.mesh.position.clone().add(new THREE.Vector3(0, 4, 12));
+            this.world.camera.position.lerp(target, 0.1);
+            this.world.camera.lookAt(this.player.mesh.position);
+        }
         this.updateCameraShake(dt);
 
-        // 11. UI Updates
+        // 12. UI Updates
         const remaining = updateUI(this.player.body.position.z, CONFIG.COURSE_LENGTH);
         updateBoostDisplay(this.player.boostCharges);
         this.updateComboDisplay();
         this.updateLeaderboard();
         this.updatePowerUpTimers();
         
-        // 12. Win State
+        // 13. Win State
         if (remaining <= 30 && !this.gameState.isWin) {
             this.gameState.win();
             this.active = false;
@@ -693,16 +757,44 @@ class Game {
         this.composer.render();
     }
     
+    /**
+     * Check combat collisions between player and competitors
+     */
+    checkCombatCollisions() {
+        if (!this.player.isAttacking || !this.player.weapon) return;
+        
+        const playerPos = this.player.body.position;
+        const attackRange = this.player.weapon.range || 3;
+        
+        this.gifterCompetitors.forEach(comp => {
+            if (comp.isDead) return;
+            
+            const dist = playerPos.distanceTo(comp.body.position);
+            if (dist < attackRange) {
+                comp.takeDamage(this.player.weapon.damage, this.player);
+                
+                if (comp.health <= 0) {
+                    logEvent(`⚔️ ${comp.name} DEFEATED!`);
+                    this.gameState.addScore(100);
+                }
+            }
+        });
+    }
+    
     updateGifterCompetitors(dt, time) {
         // Update each gifter competitor with obstacle/pill awareness
         this.gifterCompetitors.forEach(comp => {
             // Find nearest obstacle to this competitor
             const nearestObs = this.obstacles.findNearestObstacle(comp.body.position);
-            comp.setNearestObstacle(nearestObs);
+            if (comp.setNearestObstacle) {
+                comp.setNearestObstacle(nearestObs);
+            }
             
             // Find nearest pill
             const nearestPill = this.obstacles.findNearestPill(comp.body.position);
-            comp.setNearestPill(nearestPill);
+            if (comp.setNearestPill) {
+                comp.setNearestPill(nearestPill);
+            }
             
             // Update the competitor
             comp.update(dt, time);

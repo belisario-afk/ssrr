@@ -333,6 +333,60 @@
 <body>
     <!-- TikTok Mode Toggle -->
     <button class="tiktok-toggle" id="tiktok-toggle" title="Toggle TikTok LIVE Mode (9:16)">📱 TIKTOK MODE</button>
+    
+    <!-- Game Mode Toggle -->
+    <button class="game-mode-toggle" id="game-mode-toggle" title="Switch between Race and Combat modes">🏊 RACE MODE</button>
+    
+    <style>
+        .game-mode-toggle {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: linear-gradient(135deg, #44ff88, #00aa55);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 101;
+            transition: all 0.3s;
+        }
+        .game-mode-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(68, 255, 136, 0.5);
+        }
+        .game-mode-toggle.combat {
+            background: linear-gradient(135deg, #ff4444, #aa0000);
+        }
+    </style>
+    
+    <script>
+        // Game mode toggle
+        const gameModeBtn = document.getElementById('game-mode-toggle');
+        let currentMode = localStorage.getItem('biorace-game-mode') || 'race';
+        
+        function updateGameModeButton() {
+            if (currentMode === 'combat') {
+                gameModeBtn.textContent = '⚔️ COMBAT MODE';
+                gameModeBtn.classList.add('combat');
+            } else {
+                gameModeBtn.textContent = '🏊 RACE MODE';
+                gameModeBtn.classList.remove('combat');
+            }
+        }
+        
+        updateGameModeButton();
+        
+        gameModeBtn.addEventListener('click', () => {
+            currentMode = currentMode === 'race' ? 'combat' : 'race';
+            localStorage.setItem('biorace-game-mode', currentMode);
+            updateGameModeButton();
+            // Reload page to switch game mode
+            location.reload();
+        });
+    </script>
 
     <!-- MAIN MENU -->
     <div id="main-menu">
@@ -380,11 +434,35 @@
 
             <button id="start-btn">🏊 RACE TO THE EGG!</button>
             
-            <div class="controls-help">
+            <div class="controls-help" id="controls-help">
                 <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move
                 &nbsp;|&nbsp;
                 <span class="key">SPACE</span> Boost
             </div>
+            
+            <div class="controls-help combat-controls" id="combat-controls" style="display: none; background: rgba(255,50,50,0.2);">
+                <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move
+                &nbsp;|&nbsp;
+                <span class="key">SPACE</span> Boost
+                &nbsp;|&nbsp;
+                <span class="key">J</span> Attack
+                &nbsp;|&nbsp;
+                <span class="key">K</span> Block
+            </div>
+            
+            <script>
+                // Update start button and controls based on game mode
+                const startBtn = document.getElementById('start-btn');
+                const raceControls = document.getElementById('controls-help');
+                const combatControls = document.getElementById('combat-controls');
+                const savedMode = localStorage.getItem('biorace-game-mode') || 'race';
+                
+                if (savedMode === 'combat') {
+                    startBtn.textContent = '⚔️ ENTER THE GUTS!';
+                    raceControls.style.display = 'none';
+                    combatControls.style.display = 'block';
+                }
+            </script>
             
             <div class="gift-info">
                 <div class="gift-info-title">🎁 GIFT = CHAOS</div>
