@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { logEvent } from './Utils.js';
 import { CONFIG } from './Config.js';
 
@@ -10,15 +11,147 @@ export class ObstacleManager {
         this.obstacles = [];
         
         this.mockNames = ["User99", "Mikey_T", "Sarah_x", "BigDave", "Guest_1", "SpeedyBoi", "TikTok_Fan", "UrMom", "NoScope"];
+        
+        // GLTF Loader for custom models
+        this.gltfLoader = new GLTFLoader();
+        
+        // Cache for loaded models (clone from these)
+        this.modelCache = {};
+        
+        // Model scale configurations for each type
+        this.modelScales = {
+            'CONDOM': { x: 150, y: 150, z: 150 },
+            'CUCUMBER': { x: 143, y: 143, z: 143 },
+            'BANANA': { x: 3, y: 3, z: 3 },
+            'IUD': { x: 3, y: 3, z: 3 },
+            'HAIRBRUSH': { x: 3, y: 3, z: 3 }
+        };
+        
+        // Collision radius for each model type (for better hit detection)
+        this.collisionRadii = {
+            'CONDOM': 5,
+            'CUCUMBER': 4,
+            'BANANA': 3,
+            'IUD': 3.5,
+            'HAIRBRUSH': 3
+        };
+        
+        // Movement behavior for each obstacle type
+        // 'straight' = moves toward player along Z axis, player must dodge to walls
+        // 'floating' = floats/drifts inside tube
+        this.movementTypes = {
+            'CONDOM': 'straight',
+            'CUCUMBER': 'straight',
+            'BANANA': 'straight',
+            'IUD': 'floating',
+            'HAIRBRUSH': 'floating'
+        };
+        
+        // Speed at which obstacles move toward player (negative Z)
+        this.obstacleSpeed = {
+            'CONDOM': 15,
+            'CUCUMBER': 20,
+            'BANANA': 18,
+            'IUD': 8,
+            'HAIRBRUSH': 10
+        };
+        
+        // Spin speed for each obstacle type
+        this.spinSpeed = {
+            'CONDOM': 0.5,
+            'CUCUMBER': 2,
+            'BANANA': 1.5,
+            'IUD': 1,
+            'HAIRBRUSH': 0.8
+        };
+        
+        // Preload custom models
+        this.preloadModels();
 
-        // Listen for Spawn Keys
+        // Listen for Spawn Keys - 5 obstacle types + power-up
         window.addEventListener('keydown', (e) => {
-            if(e.key === '1') this.spawn('CONDOM');
-            if(e.key === '2') this.spawn('TOOTHBRUSH');
-            if(e.key === '3') this.spawn('IUD');
-            if(e.key === '4') this.spawn('FALLEN');
-            if(e.key === '5') this.spawn('PILL');
+            if(e.key === '1') this.spawn('CONDOM');      // Condom - stuns player
+            if(e.key === '2') this.spawn('CUCUMBER');    // Cucumber - damage/setback
+            if(e.key === '3') this.spawn('BANANA');      // Banana - minor damage
+            if(e.key === '4') this.spawn('IUD');         // IUD - heavy damage
+            if(e.key === '5') this.spawn('HAIRBRUSH');   // Hairbrush - stun
+            if(e.key === '6') this.spawn('FALLEN');      // Fallen swimmer (no damage)
+            if(e.key === '7') this.spawn('PILL');        // Power-up
         });
+    }
+    
+    /**
+     * Preload all custom 3D models
+     * Models should be placed in /models folder as .glb files
+     */
+    preloadModels() {
+        const modelFiles = {
+            'CONDOM': './models/condom.glb',
+            'CUCUMBER': './models/cucumber.glb',
+            'BANANA': './models/banana.glb',
+            'IUD': './models/iud.glb',
+            'HAIRBRUSH': './models/hairbrush.glb'
+        };
+        
+        for (const [type, path] of Object.entries(modelFiles)) {
+            this.gltfLoader.load(
+                path,
+                (gltf) => {
+                    this.modelCache[type] = gltf.scene;
+                    console.log(`✓ Loaded model: ${type}`);
+                },
+                undefined,
+                (error) => {
+                    console.log(`Model not found: ${path} - using fallback geometry`);
+                }
+            );
+        }
+    }
+    
+    /**
+     * Get a random spawn position INSIDE the tunnel
+     * For 'straight' obstacles: spawn in center area so player must dodge to walls
+     * For 'floating' obstacles: can spawn anywhere in tube
+     * @param {string} movementType - 'straight' or 'floating'
+     * @returns {object} {x, y} coordinates within tunnel radius
+     */
+    getSpawnPositionInTube(movementType = 'floating') {
+        if (movementType === 'straight') {
+            // Spawn in center area - player must move to walls to dodge
+            const maxRadius = CONFIG.TUNNEL_RADIUS * 0.3; // Only center 30%
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * maxRadius;
+            return {
+                x: Math.cos(angle) * distance,
+                y: Math.sin(angle) * distance
+            };
+        } else {
+            // Floating obstacles can spawn anywhere inside tube
+            const maxRadius = CONFIG.TUNNEL_RADIUS * 0.7;
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * maxRadius;
+            return {
+                x: Math.cos(angle) * distance,
+                y: Math.sin(angle) * distance
+            };
+        }
+    }
+    
+    /**
+     * Get a model from cache or return null if not loaded
+     */
+    getModel(type) {
+        if (this.modelCache[type]) {
+            const clone = this.modelCache[type].clone();
+            // Ensure materials are cloned properly
+            clone.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone();
+                }
+            });
+            return clone;
+        }
+        return null;
     }
 
     createNameSprite(name) {
@@ -68,44 +201,204 @@ export class ObstacleManager {
         const group = new THREE.Group();
         let body;
         const spawnZ = this.player.body.position.z - 80;
-        let randX = (Math.random() - 0.5) * 20; 
-        let randY = (Math.random() - 0.5) * 20;
+        
+        // Get movement type for this obstacle
+        const movementType = this.movementTypes[type] || 'floating';
+        
+        // Get spawn position INSIDE the tube based on movement type
+        const spawnPos = this.getSpawnPositionInTube(movementType);
+        let randX = spawnPos.x;
+        let randY = spawnPos.y;
+        
+        // Try to use custom model if available
+        const customModel = this.getModel(type);
+        
+        // Get scale for this model type
+        const scale = this.modelScales[type] || { x: 2, y: 2, z: 2 };
+        
+        // Get collision radius for this model type (for better GLB collision)
+        const collisionRadius = this.collisionRadii[type] || 2;
+        
+        // Get speeds for this obstacle type
+        const speed = this.obstacleSpeed[type] || 10;
+        const spin = this.spinSpeed[type] || 1;
 
-        if (type === 'TOOTHBRUSH') {
-            const hGeo = new THREE.BoxGeometry(0.5, 0.5, 12);
-            const hMat = new THREE.MeshStandardMaterial({ color: 0x0088ff });
-            group.add(new THREE.Mesh(hGeo, hMat));
-            const bGeo = new THREE.BoxGeometry(0.8, 1.5, 2.5);
-            const bMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-            const bristles = new THREE.Mesh(bGeo, bMat);
-            bristles.position.set(0, 0.8, -4);
-            group.add(bristles);
-            const shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 6));
-            body = new CANNON.Body({ mass: 10, shape: shape });
-            logEvent("⚠️ OBSTACLE:\nLOST TOOTHBRUSH");
+        if (type === 'CONDOM') {
+            // CONDOM - Stuns player for 2 seconds
+            if (customModel) {
+                customModel.scale.set(scale.x, scale.y, scale.z);
+                group.add(customModel);
+            } else {
+                // Fallback - translucent cylinder
+                const geo = new THREE.CylinderGeometry(2, 2, 6, 32, 1, true);
+                const mat = new THREE.MeshPhysicalMaterial({ 
+                    color: 0xffffdd, 
+                    transmission: 0.9, 
+                    opacity: 0.7, 
+                    transparent: true,
+                    side: THREE.DoubleSide 
+                });
+                group.add(new THREE.Mesh(geo, mat));
+            }
+            // Use sphere collision for better GLB model detection
+            // Kinematic body for predictable straight movement
+            const shape = new CANNON.Sphere(collisionRadius);
+            body = new CANNON.Body({ mass: 0, shape: shape, type: CANNON.Body.KINEMATIC });
+            
+            // Collision effect: STUN
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.stun(2); // Stun for 2 seconds
+                }
+            });
+            
+            logEvent("⚠️ CONDOM!\nSTUNS ON HIT");
 
-        } else if (type === 'CONDOM') {
-            const geo = new THREE.CylinderGeometry(2.5, 2.5, 8, 32, 1, true);
-            const mat = new THREE.MeshPhysicalMaterial({ color: 0xffffdd, transmission: 0.9, opacity: 1, side: THREE.DoubleSide });
-            group.add(new THREE.Mesh(geo, mat));
-            const shape = new CANNON.Cylinder(2.5, 2.5, 8, 16);
-            const q = new CANNON.Quaternion();
-            q.setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2);
-            body = new CANNON.Body({ mass: 2, shape: shape });
-            body.quaternion.copy(q);
-            logEvent("⚠️ OBSTACLE:\nUSED BARRIER");
+        } else if (type === 'CUCUMBER') {
+            // CUCUMBER - Deals damage (setback 50m)
+            if (customModel) {
+                customModel.scale.set(scale.x, scale.y, scale.z);
+                group.add(customModel);
+            } else {
+                // Fallback - green cylinder
+                const geo = new THREE.CylinderGeometry(0.8, 0.8, 5, 16);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x228b22, roughness: 0.6 });
+                group.add(new THREE.Mesh(geo, mat));
+                // Add bumps
+                for(let i = 0; i < 8; i++) {
+                    const bump = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.15, 8, 8),
+                        mat
+                    );
+                    bump.position.set(
+                        Math.cos(i * Math.PI/4) * 0.7,
+                        (Math.random() - 0.5) * 4,
+                        Math.sin(i * Math.PI/4) * 0.7
+                    );
+                    group.add(bump);
+                }
+            }
+            // Use sphere collision for better GLB model detection
+            // Kinematic body for predictable straight movement
+            const shape = new CANNON.Sphere(collisionRadius);
+            body = new CANNON.Body({ mass: 0, shape: shape, type: CANNON.Body.KINEMATIC });
+            
+            // Collision effect: DAMAGE (setback)
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.takeDamage(50); // Push back 50 meters
+                }
+            });
+            
+            logEvent("🥒 CUCUMBER!\nDAMAGE ON HIT");
+
+        } else if (type === 'BANANA') {
+            // BANANA - Minor damage (setback 25m)
+            if (customModel) {
+                customModel.scale.set(scale.x, scale.y, scale.z);
+                group.add(customModel);
+            } else {
+                // Fallback - yellow curved cylinder
+                const curve = new THREE.QuadraticBezierCurve3(
+                    new THREE.Vector3(0, -2, 0),
+                    new THREE.Vector3(1, 0, 0),
+                    new THREE.Vector3(0, 2, 0)
+                );
+                const geo = new THREE.TubeGeometry(curve, 20, 0.5, 8, false);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffe135, roughness: 0.4 });
+                group.add(new THREE.Mesh(geo, mat));
+            }
+            // Use sphere collision for better GLB model detection
+            // Use kinematic body for predictable straight movement (no physics forces affect it)
+            const shape = new CANNON.Sphere(collisionRadius);
+            body = new CANNON.Body({ mass: 0, shape: shape, type: CANNON.Body.KINEMATIC });
+            
+            // Collision effect: MINOR DAMAGE
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.takeDamage(25); // Push back 25 meters
+                }
+            });
+            
+            logEvent("🍌 BANANA!\nSLIP DAMAGE");
 
         } else if (type === 'IUD') {
-            const cMat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 1 });
-            const v = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4), cMat);
-            const h = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 3), cMat);
-            h.rotation.z = Math.PI/2;
-            h.position.y = 1.5;
-            group.add(v);
-            group.add(h);
-            const shape = new CANNON.Sphere(2.5); 
-            body = new CANNON.Body({ mass: 5, shape: shape });
-            logEvent("⚠️ OBSTACLE:\nCOPPER TRAP");
+            // IUD - Heavy damage (setback 75m)
+            if (customModel) {
+                customModel.scale.set(scale.x, scale.y, scale.z);
+                group.add(customModel);
+            } else {
+                // Fallback - T-shaped copper device
+                const cMat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.9, roughness: 0.2 });
+                const vertical = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4), cMat);
+                const horizontal = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3), cMat);
+                horizontal.rotation.z = Math.PI/2;
+                horizontal.position.y = 1.5;
+                group.add(vertical);
+                group.add(horizontal);
+            }
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
+            body = new CANNON.Body({ mass: 6, shape: shape });
+            
+            // Collision effect: HEAVY DAMAGE
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.takeDamage(75); // Push back 75 meters
+                }
+            });
+            
+            logEvent("⚠️ IUD!\nHEAVY DAMAGE");
+
+        } else if (type === 'HAIRBRUSH') {
+            // HAIRBRUSH - Stun (1.5 seconds)
+            if (customModel) {
+                customModel.scale.set(scale.x, scale.y, scale.z);
+                group.add(customModel);
+            } else {
+                // Fallback - brush shape
+                const handleGeo = new THREE.BoxGeometry(0.4, 0.4, 5);
+                const handleMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.7 });
+                group.add(new THREE.Mesh(handleGeo, handleMat));
+                
+                const headGeo = new THREE.BoxGeometry(1.5, 0.5, 2);
+                const headMat = new THREE.MeshStandardMaterial({ color: 0x2f1810 });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.z = -3;
+                group.add(head);
+                
+                // Bristles
+                const bristleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+                for(let i = 0; i < 20; i++) {
+                    const bristle = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.03, 0.03, 0.8, 4),
+                        bristleMat
+                    );
+                    bristle.position.set(
+                        (Math.random() - 0.5) * 1.2,
+                        0.4,
+                        -3 + (Math.random() - 0.5) * 1.5
+                    );
+                    group.add(bristle);
+                }
+            }
+            // Use sphere collision for better GLB model detection
+            const shape = new CANNON.Sphere(collisionRadius);
+            body = new CANNON.Body({ mass: 4, shape: shape });
+            
+            // Collision effect: STUN
+            body.addEventListener("collide", (e) => {
+                if(e.body === this.player.body && !body.hasHit) {
+                    body.hasHit = true;
+                    this.player.stun(1.5); // Stun for 1.5 seconds
+                }
+            });
+            
+            logEvent("🪥 HAIRBRUSH!\nSTUN ON HIT");
 
         } else if (type === 'FALLEN') {
             const skinTones = [0xffdbac, 0xf1c27d, 0xe0ac69, 0x8d5524, 0xffe0bd, 0xfffff0];
@@ -118,10 +411,12 @@ export class ObstacleManager {
             const shape = new CANNON.Sphere(0.6);
             body = new CANNON.Body({ mass: 2, shape: shape, linearDamping: 0.8 });
             
+            // Fallen swimmers can be on the walls or floating inside
             const isGrounded = Math.random() > 0.4;
             if (isGrounded) {
+                // Place near walls but still inside tube
                 const angle = Math.random() * Math.PI * 2;
-                const radius = 14; 
+                const radius = CONFIG.TUNNEL_RADIUS * 0.85; // Near edge but inside
                 randX = Math.cos(angle) * radius;
                 randY = Math.sin(angle) * radius;
                 const q = new CANNON.Quaternion();
@@ -163,16 +458,32 @@ export class ObstacleManager {
         }
 
         body.position.set(randX, randY, spawnZ);
-        if (type !== 'CONDOM' && type !== 'FALLEN' && type !== 'PILL') {
-             body.angularVelocity.set(Math.random()*3, Math.random()*3, Math.random()*3);
+        
+        // Store spin rate for rotation animation
+        let spinRate = spin;
+        
+        // Set up movement based on type
+        if (movementType === 'straight') {
+            // Kinematic bodies - we'll move them manually in update()
+            // No velocity needed - we update position directly
+        } else if (type !== 'FALLEN' && type !== 'PILL') {
+            // Floating obstacles have gentle random movement and spin
+            body.angularVelocity.set(
+                (Math.random() - 0.5) * spin,
+                (Math.random() - 0.5) * spin,
+                (Math.random() - 0.5) * spin
+            );
+            body.linearDamping = 0.95;
         }
 
         this.world.physicsWorld.addBody(body);
         this.world.scene.add(group);
-        this.obstacles.push({ mesh: group, body: body, type: type });
+        this.obstacles.push({ mesh: group, body: body, type: type, movementType: movementType, speed: speed, spinRate: spinRate, spawnX: randX, spawnY: randY });
     }
 
-    update() {
+    update(deltaTime = 1/60) {
+        const tunnelRadius = CONFIG.TUNNEL_RADIUS * 0.95; // Keep obstacles inside tube
+        
         for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const o = this.obstacles[i];
             
@@ -183,15 +494,131 @@ export class ObstacleManager {
                 this.obstacles.splice(i, 1);
                 continue;
             }
+            
+            // Handle straight-moving obstacles (kinematic - direct position control)
+            if (o.movementType === 'straight') {
+                // Move straight along Z axis toward player (constant speed, no physics drift)
+                o.body.position.z += o.speed * deltaTime;
+                
+                // Keep X/Y position FIXED at spawn position (no drifting!)
+                o.body.position.x = o.spawnX;
+                o.body.position.y = o.spawnY;
+                
+                // Rotate for visual effect (spin around Z axis so it looks like rolling toward player)
+                const spinAxis = new CANNON.Vec3(0, 0, 1); // Roll along tube axis
+                const spinAngle = o.spinRate * deltaTime;
+                const spinQuat = new CANNON.Quaternion();
+                spinQuat.setFromAxisAngle(spinAxis, spinAngle);
+                o.body.quaternion = o.body.quaternion.mult(spinQuat);
+            } else {
+                // Floating obstacles - let physics handle movement but constrain to tube
+                const pos = o.body.position;
+                const distFromCenter = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
+                if (distFromCenter > tunnelRadius) {
+                    // Push back toward center
+                    const angle = Math.atan2(pos.y, pos.x);
+                    pos.x = Math.cos(angle) * tunnelRadius;
+                    pos.y = Math.sin(angle) * tunnelRadius;
+                    // Bounce velocity inward
+                    o.body.velocity.x *= -0.5;
+                    o.body.velocity.y *= -0.5;
+                }
+            }
 
             o.mesh.position.copy(o.body.position);
             o.mesh.quaternion.copy(o.body.quaternion);
 
+            // Remove obstacles that have passed the player
             if (o.mesh.position.z > this.player.body.position.z + 50) {
                 this.world.physicsWorld.removeBody(o.body);
                 this.world.scene.remove(o.mesh);
                 this.obstacles.splice(i, 1);
             }
         }
+    }
+    
+    /**
+     * Set reference to remote players for obstacle awareness
+     */
+    setRemotePlayers(players) {
+        this.remotePlayers = players;
+    }
+    
+    /**
+     * Set reference to gifter competitors for obstacle awareness
+     */
+    setGifterCompetitors(competitors) {
+        this.gifterCompetitors = competitors;
+    }
+    
+    /**
+     * Spawn a random obstacle (used by gift system)
+     */
+    spawnRandomObstacle(gifterName = null) {
+        const types = ['CONDOM', 'CUCUMBER', 'BANANA', 'IUD', 'HAIRBRUSH'];
+        const randomType = types[Math.floor(Math.random() * types.length)];
+        this.spawn(randomType);
+        
+        if (gifterName) {
+            logEvent(`⚠️ ${gifterName} spawned ${randomType}!`);
+        }
+    }
+    
+    /**
+     * Spawn a power-up pill (used by gift system)
+     */
+    spawnPowerUp() {
+        this.spawn('PILL');
+    }
+    
+    /**
+     * Find the nearest obstacle to a position (for AI competitors)
+     */
+    findNearestObstacle(position) {
+        let nearest = null;
+        let nearestDist = Infinity;
+        
+        for (const obs of this.obstacles) {
+            // Only consider damaging obstacles
+            if (obs.type === 'PILL' || obs.type === 'FALLEN') continue;
+            
+            const dist = position.distanceTo(obs.body.position);
+            
+            // Only consider obstacles ahead
+            if (obs.body.position.z < position.z && dist < nearestDist) {
+                nearestDist = dist;
+                nearest = {
+                    position: obs.body.position.clone(),
+                    type: obs.type,
+                    distance: dist
+                };
+            }
+        }
+        
+        return nearest;
+    }
+    
+    /**
+     * Find the nearest pill to a position (for AI competitors)
+     */
+    findNearestPill(position) {
+        let nearest = null;
+        let nearestDist = Infinity;
+        
+        for (const obs of this.obstacles) {
+            if (obs.type !== 'PILL') continue;
+            
+            const dist = position.distanceTo(obs.body.position);
+            
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = {
+                    position: obs.body.position.clone(),
+                    distance: dist
+                };
+            }
+        }
+        
+        return nearest;
     }
 }

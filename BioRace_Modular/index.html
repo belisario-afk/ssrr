@@ -2,14 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bio-Runner: Multiplayer Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bio-Race: TikTok LIVE Edition</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* --- NEW MENU STYLES --- */
+        /* --- TIKTOK LIVE MODE (9:16 Portrait) --- */
+        :root {
+            --tiktok-mode: 0; /* Set to 1 for TikTok portrait mode */
+        }
+        
+        /* TikTok mode styles are primarily in style.css for consistency */
+        /* These are page-specific overrides only */
+        
+        /* --- MENU STYLES --- */
         #main-menu {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 0, 0, 0.9);
+            background: linear-gradient(180deg, rgba(30, 10, 10, 0.95), rgba(10, 5, 5, 0.98));
             backdrop-filter: blur(15px);
             z-index: 100;
             display: flex;
@@ -17,64 +25,465 @@
             align-items: center;
             justify-content: center;
             color: white;
+            overflow-y: auto;
+            padding: 20px 0;
         }
         
-        h1 { font-size: 60px; margin-bottom: 10px; color: #ff3366; text-shadow: 0 0 20px #ff0000; text-transform: uppercase; letter-spacing: 5px; }
+        h1 { 
+            font-size: 48px; 
+            margin-bottom: 10px; 
+            color: #ff3366; 
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000; 
+            text-transform: uppercase; 
+            letter-spacing: 5px;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000; }
+            50% { text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000, 0 0 80px #ff3366; }
+        }
+        
+        .subtitle {
+            font-size: 12px;
+            letter-spacing: 4px;
+            opacity: 0.7;
+            margin-bottom: 20px;
+            color: #ff9999;
+        }
         
         .menu-box {
             background: rgba(255,255,255,0.05);
-            padding: 40px;
+            padding: 25px;
             border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.1);
             text-align: center;
-            width: 400px;
+            width: 90%;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .section-title {
+            font-size: 11px; 
+            opacity: 0.7; 
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            color: #ffcccc;
         }
 
-        .color-picker { margin: 20px 0; display: flex; justify-content: center; gap: 10px; }
-        .swatch { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
-        .swatch:hover { transform: scale(1.2); border-color: white; }
-        .swatch.selected { box-shadow: 0 0 15px white; border-color: white; transform: scale(1.1); }
+        .color-picker { margin: 10px 0 20px 0; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+        .swatch-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .swatch { 
+            width: 38px; 
+            height: 38px; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            border: 3px solid rgba(255,255,255,0.2); 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .swatch:hover { transform: scale(1.15); border-color: white; box-shadow: 0 0 20px currentColor; }
+        .swatch.selected { 
+            box-shadow: 0 0 20px white, 0 0 30px currentColor; 
+            border-color: white; 
+            transform: scale(1.1);
+        }
+        .swatch.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            text-shadow: 0 0 5px black;
+        }
+        .swatch-label {
+            font-size: 8px;
+            text-align: center;
+            color: #999;
+            margin-top: 2px;
+        }
 
         #start-btn {
             background: linear-gradient(45deg, #ff0050, #ff0000);
             color: white;
             border: none;
             padding: 15px 50px;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             border-radius: 50px;
             cursor: pointer;
             box-shadow: 0 0 30px rgba(255,0,0,0.4);
             transition: all 0.3s;
             text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        #start-btn:hover { transform: scale(1.05); box-shadow: 0 0 50px rgba(255,0,0,0.8); }
+        #start-btn:hover { 
+            transform: scale(1.05); 
+            box-shadow: 0 0 50px rgba(255,0,0,0.8);
+            background: linear-gradient(45deg, #ff1060, #ff2010);
+        }
+        
+        /* TikTok Mode Toggle */
+        .tiktok-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #00f2ea, #ff0050);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 101;
+            transition: all 0.3s;
+        }
+        .tiktok-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 0, 80, 0.5);
+        }
+        .tiktok-toggle.active {
+            background: linear-gradient(135deg, #ff0050, #00f2ea);
+            box-shadow: 0 0 20px rgba(0, 242, 234, 0.5);
+        }
+        
+        /* Settings Toggle Button */
+        .settings-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .settings-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        /* Controls Help */
+        .controls-help {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            font-size: 11px;
+            color: #aaa;
+        }
+        .controls-help .key {
+            display: inline-block;
+            background: rgba(255,255,255,0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 0 2px;
+            font-weight: bold;
+            color: white;
+        }
 
-        .lobby-info { margin-top: 20px; font-size: 12px; color: #888; }
+        .lobby-info { 
+            margin-top: 15px; 
+            font-size: 11px; 
+            color: #888;
+            line-height: 1.5;
+        }
+        .lobby-info .status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: blink 1.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Gift Test Info */
+        .gift-info {
+            margin-top: 12px;
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(255,100,150,0.1), rgba(255,200,100,0.1));
+            border-radius: 10px;
+            border: 1px solid rgba(255,150,100,0.2);
+        }
+        .gift-info-title {
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: #ffaa88;
+            margin-bottom: 6px;
+        }
+        .gift-keys {
+            font-size: 10px;
+            color: #aaa;
+            line-height: 1.6;
+        }
+        .gift-keys span {
+            color: #ff9966;
+        }
+        
+        /* TikTok Portrait Mode Specific Styles - OPTIMIZED FOR STREAMING */
+        body.tiktok-mode #main-menu {
+            padding: 5px;
+        }
+        body.tiktok-mode h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        body.tiktok-mode .subtitle {
+            font-size: 10px;
+            margin-bottom: 10px;
+        }
+        body.tiktok-mode .menu-box {
+            padding: 12px;
+            max-width: 320px;
+        }
+        body.tiktok-mode .section-title {
+            font-size: 10px;
+        }
+        body.tiktok-mode .swatch {
+            width: 30px;
+            height: 30px;
+        }
+        body.tiktok-mode .swatch-label {
+            font-size: 7px;
+        }
+        body.tiktok-mode #start-btn {
+            padding: 10px 30px;
+            font-size: 14px;
+        }
+        body.tiktok-mode .gift-info {
+            padding: 8px;
+            font-size: 8px;
+        }
+        body.tiktok-mode .gift-info-title {
+            font-size: 9px;
+        }
+        body.tiktok-mode .controls-help {
+            padding: 8px;
+            font-size: 9px;
+        }
+        body.tiktok-mode .lobby-info {
+            font-size: 9px;
+        }
+        
+        /* TikTok Mode: HUD at bottom, minimal and transparent */
+        body.tiktok-mode .hud-panel {
+            width: auto !important;
+            min-width: 80px !important;
+            max-width: 45% !important;
+            padding: 5px 8px !important;
+            font-size: 9px !important;
+            border-radius: 6px !important;
+            background: rgba(0, 0, 0, 0.4) !important;
+        }
+        body.tiktok-mode .hud-panel.left,
+        body.tiktok-mode .hud-panel.right {
+            border: none !important;
+        }
+        body.tiktok-mode #distance {
+            font-size: 18px !important;
+        }
+        body.tiktok-mode #boost-charges {
+            font-size: 14px !important;
+        }
+        body.tiktok-mode .label {
+            font-size: 8px !important;
+            letter-spacing: 1px !important;
+            margin-bottom: 2px !important;
+        }
+        body.tiktok-mode #progress-container {
+            height: 4px;
+            margin-top: 4px;
+        }
+        body.tiktok-mode #event-log {
+            font-size: 9px !important;
+            min-height: 30px !important;
+            line-height: 1.3 !important;
+        }
+        body.tiktok-mode #controls-hint {
+            display: none; /* Hide controls in TikTok mode - viewers can't play */
+        }
+        body.tiktok-mode #combo-display {
+            font-size: 24px !important;
+            right: 20px !important;
+        }
+        body.tiktok-mode .race-leaderboard {
+            display: none !important; /* Hide leaderboard in TikTok mode to save space */
+        }
+        body.tiktok-mode #boost-display {
+            margin-top: 5px !important;
+        }
+        body.tiktok-mode #boost-display .label {
+            margin-top: 5px !important;
+        }
     </style>
 </head>
 <body>
+    <!-- TikTok Mode Toggle -->
+    <button class="tiktok-toggle" id="tiktok-toggle" title="Toggle TikTok LIVE Mode (9:16)">📱 TIKTOK MODE</button>
+    
+    <!-- Game Mode Toggle -->
+    <button class="game-mode-toggle" id="game-mode-toggle" title="Switch between Race and Combat modes">🏊 RACE MODE</button>
+    
+    <style>
+        .game-mode-toggle {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: linear-gradient(135deg, #44ff88, #00aa55);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 101;
+            transition: all 0.3s;
+        }
+        .game-mode-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(68, 255, 136, 0.5);
+        }
+        .game-mode-toggle.combat {
+            background: linear-gradient(135deg, #ff4444, #aa0000);
+        }
+    </style>
+    
+    <script>
+        // Game mode toggle
+        const gameModeBtn = document.getElementById('game-mode-toggle');
+        let currentMode = localStorage.getItem('biorace-game-mode') || 'race';
+        
+        function updateGameModeButton() {
+            if (currentMode === 'combat') {
+                gameModeBtn.textContent = '⚔️ COMBAT MODE';
+                gameModeBtn.classList.add('combat');
+            } else {
+                gameModeBtn.textContent = '🏊 RACE MODE';
+                gameModeBtn.classList.remove('combat');
+            }
+        }
+        
+        updateGameModeButton();
+        
+        gameModeBtn.addEventListener('click', () => {
+            currentMode = currentMode === 'race' ? 'combat' : 'race';
+            localStorage.setItem('biorace-game-mode', currentMode);
+            updateGameModeButton();
+            // Reload page to switch game mode
+            location.reload();
+        });
+    </script>
 
     <!-- MAIN MENU -->
     <div id="main-menu">
-        <h1>Bio-Race</h1>
+        <h1>🏊 Bio-Race</h1>
+        <div class="subtitle">THE ULTIMATE SWIMMER'S JOURNEY</div>
+        
         <div class="menu-box">
-            <div style="font-size: 14px; opacity: 0.7; letter-spacing: 2px;">SELECT GENETIC MARKER</div>
+            <div class="section-title">🎨 PICK YOUR SWIMMER</div>
             
-            <!-- Color Selection -->
+            <!-- Skin Tone Color Selection -->
             <div class="color-picker" id="color-picker">
-                <div class="swatch selected" style="background: #ffffff;" data-color="0xffffff"></div>
-                <div class="swatch" style="background: #00ff88;" data-color="0x00ff88"></div>
-                <div class="swatch" style="background: #ff0050;" data-color="0xff0050"></div>
-                <div class="swatch" style="background: #0088ff;" data-color="0x0088ff"></div>
-                <div class="swatch" style="background: #ffff00;" data-color="0xffff00"></div>
+                <div class="swatch-container">
+                    <div class="swatch selected" style="background: #FFDBAC;" data-color="0xFFDBAC" title="Light"></div>
+                    <div class="swatch-label">Light</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #F1C27D;" data-color="0xF1C27D" title="Peach"></div>
+                    <div class="swatch-label">Peach</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #E0AC69;" data-color="0xE0AC69" title="Golden"></div>
+                    <div class="swatch-label">Golden</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #C68642;" data-color="0xC68642" title="Tan"></div>
+                    <div class="swatch-label">Tan</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #8D5524;" data-color="0x8D5524" title="Caramel"></div>
+                    <div class="swatch-label">Caramel</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #6B4423;" data-color="0x6B4423" title="Chocolate"></div>
+                    <div class="swatch-label">Choco</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #4A2912;" data-color="0x4A2912" title="Espresso"></div>
+                    <div class="swatch-label">Espresso</div>
+                </div>
+                <div class="swatch-container">
+                    <div class="swatch" style="background: #FFF5E1;" data-color="0xFFF5E1" title="Cream"></div>
+                    <div class="swatch-label">Cream</div>
+                </div>
             </div>
 
-            <button id="start-btn">DEPLOY CELL</button>
+            <button id="start-btn">🏊 RACE TO THE EGG!</button>
+            
+            <div class="controls-help" id="controls-help">
+                <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move
+                &nbsp;|&nbsp;
+                <span class="key">SPACE</span> Boost
+            </div>
+            
+            <div class="controls-help combat-controls" id="combat-controls" style="display: none; background: rgba(255,50,50,0.2);">
+                <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move
+                &nbsp;|&nbsp;
+                <span class="key">SPACE</span> Boost
+                &nbsp;|&nbsp;
+                <span class="key">J</span> Attack
+                &nbsp;|&nbsp;
+                <span class="key">K</span> Block
+            </div>
+            
+            <script>
+                // Update start button and controls based on game mode
+                const startBtn = document.getElementById('start-btn');
+                const raceControls = document.getElementById('controls-help');
+                const combatControls = document.getElementById('combat-controls');
+                const savedMode = localStorage.getItem('biorace-game-mode') || 'race';
+                
+                if (savedMode === 'combat') {
+                    startBtn.textContent = '⚔️ ENTER THE GUTS!';
+                    raceControls.style.display = 'none';
+                    combatControls.style.display = 'block';
+                }
+            </script>
+            
+            <div class="gift-info">
+                <div class="gift-info-title">🎁 GIFT = CHAOS</div>
+                <div class="gift-keys">
+                    Send coins to spawn obstacles and competitors!<br>
+                    <span>1 coin</span> = 1 item | <span>50+ coins</span> = Your swimmer joins!<br>
+                    <span>500+ coins</span> = Massive chaos! | <span>1000+</span> = EVERYTHING!
+                </div>
+            </div>
+            
+            <div class="gift-info" style="margin-top: 8px; background: linear-gradient(135deg, rgba(0,150,255,0.1), rgba(0,255,150,0.1));">
+                <div class="gift-info-title">💬 CHAT COMMANDS</div>
+                <div class="gift-keys">
+                    Type <span>!banana</span> 🍌 or <span>!cucumber</span> 🥒 to spawn obstacles<br>
+                    Type <span>!help</span> to spawn a power-up pill for the streamer
+                </div>
+            </div>
             
             <div class="lobby-info">
-                TIKTOK LIVE MULTIPLAYER READY<br>
-                WAITING FOR VIEWERS...
+                <span class="status"></span>TIKTOK LIVE READY<br>
+                <small>Gifts spawn obstacles & competitors! Help me or sabotage me! 💀</small>
             </div>
         </div>
     </div>
@@ -82,20 +491,34 @@
     <!-- HUD -->
     <div id="ui-layer">
         <div class="hud-panel left">
-            <div class="label">DISTANCE TO TARGET</div>
+            <div class="label">🎯 DISTANCE TO EGG</div>
             <div id="distance">5000m</div>
             <div id="progress-container"><div id="progress-bar"></div></div>
+            <div id="boost-display" class="boost-meter">
+                <div class="label" style="margin-top: 15px;">⚡ BOOST</div>
+                <div id="boost-charges">⚡ 0</div>
+            </div>
         </div>
         <div class="hud-panel right">
-            <div class="label">MULTIPLAYER FEED</div>
-            <div id="event-log">WAITING FOR GIFTS...</div>
+            <div class="label">🎁 GIFT FEED</div>
+            <div id="event-log">WAITING FOR CHAOS...</div>
         </div>
+    </div>
+    
+    <!-- Controls Hint (in-game) -->
+    <div id="controls-hint">
+        <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> move
+        &nbsp;|&nbsp;
+        <span class="key">SPACE</span> boost
+        &nbsp;|&nbsp;
+        <span class="key">ESC</span> pause
     </div>
 
     <!-- WIN SCREEN -->
     <div id="win-screen">
-        <div id="win-text">TARGET FERTILIZED</div>
-        <button id="restart-btn" onclick="location.reload()">RESTART</button>
+        <div id="win-text">🎉 YOU REACHED THE EGG! 🎉</div>
+        <div id="win-subtitle">MISSION COMPLETE • YOU'RE A WINNER</div>
+        <button id="restart-btn" onclick="location.reload()">🔄 RACE AGAIN</button>
     </div>
 
     <script type="importmap">
@@ -106,6 +529,27 @@
             "cannon": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
         }
     }
+    </script>
+
+    <!-- TikTok Mode Toggle Script -->
+    <script>
+        // TikTok LIVE Mode Toggle (9:16 portrait)
+        const tiktokToggle = document.getElementById('tiktok-toggle');
+        const savedTiktokMode = localStorage.getItem('tiktok-mode') === 'true';
+        
+        if (savedTiktokMode) {
+            document.body.classList.add('tiktok-mode');
+            tiktokToggle.classList.add('active');
+        }
+        
+        tiktokToggle.addEventListener('click', () => {
+            document.body.classList.toggle('tiktok-mode');
+            tiktokToggle.classList.toggle('active');
+            localStorage.setItem('tiktok-mode', document.body.classList.contains('tiktok-mode'));
+            
+            // Trigger resize event for Three.js
+            window.dispatchEvent(new Event('resize'));
+        });
     </script>
 
     <script type="module" src="./src/Main.js"></script>
