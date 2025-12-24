@@ -44,8 +44,8 @@ class Game {
     }
 
     setupMenu() {
-        // Handle Color Selection
-        this.selectedColor = 0xffffff;
+        // Handle Color Selection - now default to first skin tone
+        this.selectedColor = 0xFFDBAC; // Light skin tone default
         const swatches = document.querySelectorAll('.swatch');
         swatches.forEach(s => {
             s.addEventListener('click', () => {
@@ -58,6 +58,9 @@ class Game {
         // Handle Start Button
         document.getElementById('start-btn').addEventListener('click', () => {
             document.getElementById('main-menu').style.display = 'none';
+            // Hide TikTok toggle during gameplay
+            const tiktokToggle = document.getElementById('tiktok-toggle');
+            if (tiktokToggle) tiktokToggle.style.display = 'none';
             this.startGame();
         });
     }

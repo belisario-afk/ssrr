@@ -7,16 +7,16 @@ import { logEvent } from './Utils.js';
 import { getAudioSystem } from './AudioSystem.js';
 import { getGameState } from './GameState.js';
 
-// Skin tone colors for swimmers
+// Skin tone colors for swimmers (matching UI picker)
 const SKIN_TONES = [
-    0xffdbac, // Light
-    0xf1c27d, // Fair
-    0xe0ac69, // Medium
-    0xc68642, // Tan
-    0x8d5524, // Brown
-    0x5c3317, // Dark Brown
-    0xffe0bd, // Peach
-    0xd4a574  // Caramel
+    0xFFDBAC, // Light
+    0xF1C27D, // Peach
+    0xE0AC69, // Golden
+    0xC68642, // Tan
+    0x8D5524, // Caramel
+    0x6B4423, // Chocolate
+    0x4A2912, // Espresso
+    0xFFF5E1  // Cream
 ];
 
 // Shared GLTFLoader instance for all players

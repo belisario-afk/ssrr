@@ -424,19 +424,31 @@ export class GiftSystem {
     }
     
     /**
-     * Get a unique color for a gifter based on their name
+     * Get a skin tone color for a gifter based on their name
+     * This gives each gifter a consistent skin tone for their swimmer
      */
     getGifterColor(name) {
-        // Generate a color from the name hash
+        // Skin tone palette (same as Player.js)
+        const SKIN_TONES = [
+            0xFFDBAC, // Light
+            0xF1C27D, // Peach
+            0xE0AC69, // Golden
+            0xC68642, // Tan
+            0x8D5524, // Caramel
+            0x6B4423, // Chocolate
+            0x4A2912, // Espresso
+            0xFFF5E1  // Cream
+        ];
+        
+        // Generate consistent index from name hash
         let hash = 0;
         for (let i = 0; i < name.length; i++) {
             hash = name.charCodeAt(i) + ((hash << 5) - hash);
         }
-        // Generate bright, saturated colors
-        const hue = Math.abs(hash % 360);
-        const color = new THREE.Color();
-        color.setHSL(hue / 360, 0.9, 0.6);
-        return color.getHex();
+        
+        // Pick a skin tone based on hash
+        const index = Math.abs(hash) % SKIN_TONES.length;
+        return SKIN_TONES[index];
     }
     
     /**
