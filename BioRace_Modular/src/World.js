@@ -107,8 +107,32 @@ export class World {
     }
 
     onResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        // Check if TikTok mode is active
+        const isTikTokMode = document.body.classList.contains('tiktok-mode');
+        
+        if (isTikTokMode) {
+            // TikTok mode: Use 9:16 aspect ratio for portrait streaming
+            const targetAspect = 9 / 16;
+            let width, height;
+            
+            if (window.innerWidth / window.innerHeight > targetAspect) {
+                // Window is wider than 9:16 - fit to height
+                height = window.innerHeight;
+                width = height * targetAspect;
+            } else {
+                // Window is taller than 9:16 - fit to width
+                width = window.innerWidth;
+                height = width / targetAspect;
+            }
+            
+            this.camera.aspect = targetAspect;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(width, height);
+        } else {
+            // Normal mode: Use full window
+            this.camera.aspect = window.innerWidth / window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+        }
     }
 }

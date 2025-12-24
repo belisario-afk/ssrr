@@ -244,34 +244,100 @@
             color: #ff9966;
         }
         
-        /* TikTok Portrait Mode Specific Styles */
+        /* TikTok Portrait Mode Specific Styles - OPTIMIZED FOR STREAMING */
         body.tiktok-mode #main-menu {
-            padding: 10px;
+            padding: 5px;
         }
         body.tiktok-mode h1 {
-            font-size: 36px;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        body.tiktok-mode .subtitle {
+            font-size: 10px;
+            margin-bottom: 10px;
         }
         body.tiktok-mode .menu-box {
-            padding: 15px;
+            padding: 12px;
+            max-width: 320px;
+        }
+        body.tiktok-mode .section-title {
+            font-size: 10px;
         }
         body.tiktok-mode .swatch {
-            width: 35px;
-            height: 35px;
+            width: 30px;
+            height: 30px;
+        }
+        body.tiktok-mode .swatch-label {
+            font-size: 7px;
         }
         body.tiktok-mode #start-btn {
-            padding: 12px 40px;
-            font-size: 16px;
+            padding: 10px 30px;
+            font-size: 14px;
         }
         body.tiktok-mode .gift-info {
-            padding: 10px;
+            padding: 8px;
+            font-size: 8px;
+        }
+        body.tiktok-mode .gift-info-title {
             font-size: 9px;
         }
+        body.tiktok-mode .controls-help {
+            padding: 8px;
+            font-size: 9px;
+        }
+        body.tiktok-mode .lobby-info {
+            font-size: 9px;
+        }
+        
+        /* TikTok Mode: HUD at bottom, minimal and transparent */
         body.tiktok-mode .hud-panel {
-            width: 150px !important;
-            padding: 10px !important;
+            width: auto !important;
+            min-width: 80px !important;
+            max-width: 45% !important;
+            padding: 5px 8px !important;
+            font-size: 9px !important;
+            border-radius: 6px !important;
+            background: rgba(0, 0, 0, 0.4) !important;
+        }
+        body.tiktok-mode .hud-panel.left,
+        body.tiktok-mode .hud-panel.right {
+            border: none !important;
         }
         body.tiktok-mode #distance {
-            font-size: 28px !important;
+            font-size: 18px !important;
+        }
+        body.tiktok-mode #boost-charges {
+            font-size: 14px !important;
+        }
+        body.tiktok-mode .label {
+            font-size: 8px !important;
+            letter-spacing: 1px !important;
+            margin-bottom: 2px !important;
+        }
+        body.tiktok-mode #progress-container {
+            height: 4px;
+            margin-top: 4px;
+        }
+        body.tiktok-mode #event-log {
+            font-size: 9px !important;
+            min-height: 30px !important;
+            line-height: 1.3 !important;
+        }
+        body.tiktok-mode #controls-hint {
+            display: none; /* Hide controls in TikTok mode - viewers can't play */
+        }
+        body.tiktok-mode #combo-display {
+            font-size: 24px !important;
+            right: 20px !important;
+        }
+        body.tiktok-mode .race-leaderboard {
+            display: none !important; /* Hide leaderboard in TikTok mode to save space */
+        }
+        body.tiktok-mode #boost-display {
+            margin-top: 5px !important;
+        }
+        body.tiktok-mode #boost-display .label {
+            margin-top: 5px !important;
         }
     </style>
 </head>
