@@ -535,9 +535,9 @@
     <script>
         // TikTok LIVE Mode Toggle (9:16 portrait)
         const tiktokToggle = document.getElementById('tiktok-toggle');
-        const savedMode = localStorage.getItem('tiktok-mode') === 'true';
+        const savedTiktokMode = localStorage.getItem('tiktok-mode') === 'true';
         
-        if (savedMode) {
+        if (savedTiktokMode) {
             document.body.classList.add('tiktok-mode');
             tiktokToggle.classList.add('active');
         }

@@ -51,13 +51,13 @@ export class GutsWorld {
         // 5. Lighting
         this.setupLighting();
 
+        // Decorations array for updates (must be before buildGutsEnvironment)
+        this.decorations = [];
+        this.bloodCells = [];
+
         // 6. Build Environment
         this.buildGutsEnvironment();
         this.buildGoal();
-        
-        // Decorations array for updates
-        this.decorations = [];
-        this.bloodCells = [];
 
         // Handle Resize
         window.addEventListener('resize', () => this.onResize());
