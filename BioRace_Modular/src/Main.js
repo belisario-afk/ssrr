@@ -419,9 +419,9 @@ class Game {
                     z: this.player.body.position.z - 20
                 }
             });
-            // Give AI competitor a random weapon
-            const weapons = ['sword', 'gun'];
-            competitor.equipWeapon(weapons[Math.floor(Math.random() * weapons.length)]);
+            // Give AI competitor a random weapon from available types
+            const AI_WEAPONS = ['sword', 'dagger', 'axe', 'gun'];
+            competitor.equipWeapon(AI_WEAPONS[Math.floor(Math.random() * AI_WEAPONS.length)]);
         } else {
             competitor = new Player(this.world, {
                 name: name,

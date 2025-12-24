@@ -12,6 +12,13 @@ import { getGameState } from './GameState.js';
  * Phase 1 of major game upgrade
  */
 
+// Character configuration constants
+const CHARACTER_CONFIG = {
+    SKIN_BLEND_AMOUNT: 0.6,           // How much to blend skin tone onto model (0-1)
+    SWIMMER_HEAD_ROTATION: Math.PI / 2, // Rotation to make swimmer face forward as head
+    SWIMMER_HEAD_SCALE: 0.8           // Scale of swimmer model when used as head
+};
+
 // Skin tone colors for characters
 const SKIN_TONES = [
     0xFFDBAC, // Light
@@ -312,8 +319,9 @@ export class Character {
                 }
                 
                 // Scale swimmer to fit as head
-                head.scale.set(0.8, 0.8, 0.8);
-                head.rotation.x = Math.PI / 2; // Rotate to face forward
+                const scale = CHARACTER_CONFIG.SWIMMER_HEAD_SCALE;
+                head.scale.set(scale, scale, scale);
+                head.rotation.x = CHARACTER_CONFIG.SWIMMER_HEAD_ROTATION;
                 
                 // Apply skin tone
                 head.traverse((child) => {
@@ -324,7 +332,7 @@ export class Character {
                             child.material = child.material.clone();
                             this.modelMaterials.push(child.material);
                             if (child.material.color) {
-                                child.material.color.lerp(skinColor, 0.6);
+                                child.material.color.lerp(skinColor, CHARACTER_CONFIG.SKIN_BLEND_AMOUNT);
                             }
                         }
                     }
