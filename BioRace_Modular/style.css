@@ -101,9 +101,7 @@ body.tiktok-mode .hud-container {
     background-clip: text;
 }
 
-body.tiktok-mode #distance {
-    font-size: 24px;
-}
+/* Note: TikTok mode #distance style is in index.html for specificity */
 
 #progress-container {
     width: 100%;
