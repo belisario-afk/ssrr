@@ -523,7 +523,7 @@ export class GutsWorld {
     }
 
     step(dt) {
-        this.physicsWorld.step(1/60, dt);
+        this.physicsWorld.step(CONFIG.PHYSICS_TIMESTEP || 1/60, dt);
     }
 
     render(composer) {

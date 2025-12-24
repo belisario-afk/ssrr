@@ -9,6 +9,18 @@ export const CONFIG = {
     SPEED: 25,
     STEER_FORCE: 50,
     BOOST_FORCE: 8,
+    PHYSICS_TIMESTEP: 1/60, // Fixed physics timestep
+    
+    // Character Settings
+    CHARACTER_COLLISION_RADIUS: 1.0,
+    
+    // Combat Settings
+    COMBAT: {
+        hitEffectDuration: 0.5,
+        hitEffectFadeRate: 2,
+        projectileRadius: 0.1,
+        muzzleFlashDuration: 50 // ms
+    },
     
     // Visuals - BRIGHTENED
     FOG_COLOR: 0x330505, 

@@ -576,9 +576,10 @@ export class CombatSystem {
      * Create a projectile
      */
     createProjectile(position, direction, config, owner) {
-        const bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const projectileRadius = CONFIG.COMBAT?.projectileRadius || 0.1;
+        const bulletGeo = new THREE.SphereGeometry(projectileRadius, 8, 8);
         const bulletMat = new THREE.MeshBasicMaterial({ 
-            color: config.type === 'laser' ? 0x00ffff : 0xffff00 
+            color: config.type === 'hitscan' ? 0x00ffff : 0xffff00 
         });
         const bullet = new THREE.Mesh(bulletGeo, bulletMat);
         bullet.position.copy(position);
@@ -783,12 +784,14 @@ export class CombatSystem {
                 effect.mesh.velocity.y -= 20 * dt; // Gravity
             }
             
-            // Fade out
+            // Fade out using configurable rate
+            const fadeRate = CONFIG.COMBAT?.hitEffectFadeRate || 2;
             if (effect.mesh.material.opacity !== undefined) {
-                effect.mesh.material.opacity = Math.max(0, 1 - effect.age * 2);
+                effect.mesh.material.opacity = Math.max(0, 1 - effect.age * fadeRate);
             }
             
-            if (effect.age > 0.5) {
+            const effectDuration = CONFIG.COMBAT?.hitEffectDuration || 0.5;
+            if (effect.age > effectDuration) {
                 this.world.scene.remove(effect.mesh);
                 effect.mesh.geometry.dispose();
                 effect.mesh.material.dispose();

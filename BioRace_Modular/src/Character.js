@@ -122,7 +122,8 @@ export class Character {
         this.isDead = false;
 
         // Physics Body - Capsule-like shape for humanoid
-        const shape = new CANNON.Sphere(1.0); // Larger collision for humanoid
+        const collisionRadius = CONFIG.CHARACTER_COLLISION_RADIUS || 1.0;
+        const shape = new CANNON.Sphere(collisionRadius); // Larger collision for humanoid
         this.body = new CANNON.Body({ 
             mass: 1, 
             shape: shape, 
