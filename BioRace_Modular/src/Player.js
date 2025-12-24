@@ -7,7 +7,9 @@ import { logEvent } from './Utils.js';
 import { getAudioSystem } from './AudioSystem.js';
 import { getGameState } from './GameState.js';
 
-// Skin tone colors for swimmers (matching UI picker)
+// Skin tone colors for swimmers (matching UI picker in index.html)
+// IMPORTANT: Array order must match between Player.js, GiftSystem.js, and UI for consistent colors
+// 0=Light, 1=Peach, 2=Golden, 3=Tan, 4=Caramel, 5=Chocolate, 6=Espresso, 7=Cream
 const SKIN_TONES = [
     0xFFDBAC, // Light
     0xF1C27D, // Peach

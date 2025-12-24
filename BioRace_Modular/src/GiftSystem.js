@@ -428,7 +428,8 @@ export class GiftSystem {
      * This gives each gifter a consistent skin tone for their swimmer
      */
     getGifterColor(name) {
-        // Skin tone palette (same as Player.js)
+        // Skin tone palette - MUST match Player.js and UI order for consistency
+        // 0=Light, 1=Peach, 2=Golden, 3=Tan, 4=Caramel, 5=Chocolate, 6=Espresso, 7=Cream
         const SKIN_TONES = [
             0xFFDBAC, // Light
             0xF1C27D, // Peach
